@@ -18,7 +18,21 @@ const db = admin.firestore();
 
 // --- Express App Setup ---
 const app = express();
-app.use(cors());
+
+// --- NEW: CORS Configuration for Production ---
+const allowedOrigins = ['http://localhost:5173', 'https://cbj-prediction-app-5c396.web.app'];
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (allowedOrigins.includes(origin) || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+};
+app.use(cors(corsOptions));
+// --- End of New CORS Configuration ---
+
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
