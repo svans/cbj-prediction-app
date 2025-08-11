@@ -3,28 +3,48 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import PredictionForm from './PredictionForm';
-import CommunityPicks from './CommunityPicks'; // <-- Import the new component
+import CommunityPicks from './CommunityPicks';
 import { auth } from '../firebase';
 
 const GameList = () => {
     const [games, setGames] = useState([]);
     const [loading, setLoading] = useState(true);
     const [openFormId, setOpenFormId] = useState(null);
-    const [openPicksId, setOpenPicksId] = useState(null); // <-- State to show/hide picks
+    const [openPicksId, setOpenPicksId] = useState(null);
     const [myPredictions, setMyPredictions] = useState({});
     const userId = auth.currentUser?.uid;
 
     useEffect(() => {
-        // ... (fetchGameData logic remains the same) ...
+        const fetchGameData = async () => {
+            if (!userId) {
+                const scheduleRes = await axios.get('http://localhost:3001/api/schedule');
+                setGames(scheduleRes.data.games);
+                setLoading(false);
+                return;
+            }
+            try {
+                const [scheduleRes, predictionsRes] = await Promise.all([
+                    axios.get('http://localhost:3001/api/schedule'),
+                    axios.get(`http://localhost:3001/api/my-predictions/${userId}`)
+                ]);
+                setGames(scheduleRes.data.games);
+                setMyPredictions(predictionsRes.data);
+            } catch (error) {
+                console.error("Error fetching game data!", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchGameData();
     }, [userId]);
 
     const toggleForm = (gameId) => {
-        setOpenPicksId(null); // Close picks when opening form
+        setOpenPicksId(null);
         setOpenFormId(prevId => (prevId === gameId ? null : gameId));
     };
 
     const togglePicks = (gameId) => {
-        setOpenFormId(null); // Close form when opening picks
+        setOpenFormId(null);
         setOpenPicksId(prevId => (prevId === gameId ? null : prevId));
     };
 
@@ -42,27 +62,26 @@ const GameList = () => {
 
                 return (
                     <div key={game.id} className="bg-white shadow-lg rounded-lg p-4 transition-shadow hover:shadow-xl">
-                        <div className="flex justify-between items-center">
-                            <div>
+                        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                            <div className="text-center md:text-left">
                                 <h4 className="text-xl font-bold text-union-blue">{game.awayTeam.placeName.default} @ {game.homeTeam.placeName.default}</h4>
                                 <p className="text-gray-600">{new Date(game.startTimeUTC).toLocaleString()}</p>
                             </div>
-                            <div className="flex gap-2">
-                                {/* Always show the View Picks button */}
-                                <button onClick={() => togglePicks(game.id)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-colors">
-                                    {arePicksOpen ? 'Hide Picks' : 'View Picks'}
+                            <div className="flex gap-2 w-full md:w-auto">
+                                <button onClick={() => togglePicks(game.id)} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-colors">
+                                    {arePicksOpen ? 'Hide' : 'Picks'}
                                 </button>
                                 
                                 {!isLocked && (
                                     isFormOpen ? (
-                                        <button onClick={() => toggleForm(game.id)} className="bg-goal-red hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-colors">Cancel</button>
+                                        <button onClick={() => toggleForm(game.id)} className="flex-1 bg-goal-red hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-colors">Cancel</button>
                                     ) : existingPrediction ? (
-                                        <button onClick={() => toggleForm(game.id)} className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded transition-colors">Edit Prediction</button>
+                                        <button onClick={() => toggleForm(game.id)} className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded transition-colors">Edit</button>
                                     ) : (
-                                        <button onClick={() => toggleForm(game.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors">Make Prediction</button>
+                                        <button onClick={() => toggleForm(game.id)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors">Predict</button>
                                     )
                                 )}
-                                {isLocked && <div className="bg-gray-400 text-white font-bold py-2 px-4 rounded cursor-not-allowed">Locked</div>}
+                                {isLocked && <div className="flex-1 text-center bg-gray-400 text-white font-bold py-2 px-4 rounded cursor-not-allowed">Locked</div>}
                             </div>
                         </div>
                         {isFormOpen && (
