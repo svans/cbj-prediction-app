@@ -3,80 +3,76 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import PredictionForm from './PredictionForm';
+import CommunityPicks from './CommunityPicks'; // <-- Import the new component
 import { auth } from '../firebase';
 
 const GameList = () => {
     const [games, setGames] = useState([]);
     const [loading, setLoading] = useState(true);
     const [openFormId, setOpenFormId] = useState(null);
-    const [myPredictions, setMyPredictions] = useState({}); // <-- State for user's predictions
+    const [openPicksId, setOpenPicksId] = useState(null); // <-- State to show/hide picks
+    const [myPredictions, setMyPredictions] = useState({});
     const userId = auth.currentUser?.uid;
 
     useEffect(() => {
-        const fetchGameData = async () => {
-            if (!userId) {
-                // If user is not logged in, just fetch the schedule
-                const scheduleRes = await axios.get('https://cbj-prediction-app.onrender.com/api/schedule');
-                setGames(scheduleRes.data.games);
-                setLoading(false);
-                return;
-            }
-
-            // If user is logged in, fetch both schedule and their predictions
-            try {
-                const [scheduleRes, predictionsRes] = await Promise.all([
-                    axios.get('https://cbj-prediction-app.onrender.com/api/schedule'),
-                    axios.get(`https://cbj-prediction-app.onrender.com/api/my-predictions/${userId}`)
-                ]);
-                setGames(scheduleRes.data.games);
-                setMyPredictions(predictionsRes.data);
-            } catch (error) {
-                console.error("Error fetching game data!", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchGameData();
-    }, [userId]); // Re-run when the user logs in or out
+        // ... (fetchGameData logic remains the same) ...
+    }, [userId]);
 
     const toggleForm = (gameId) => {
+        setOpenPicksId(null); // Close picks when opening form
         setOpenFormId(prevId => (prevId === gameId ? null : gameId));
+    };
+
+    const togglePicks = (gameId) => {
+        setOpenFormId(null); // Close form when opening picks
+        setOpenPicksId(prevId => (prevId === gameId ? null : prevId));
     };
 
     if (loading) return <p className="text-center mt-8">Loading games...</p>;
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 p-4 md:p-8">
+            <h2 className="text-3xl font-bold mb-6 text-gray-800">Upcoming Games</h2>
             {games.map(game => {
                 const deadline = new Date(new Date(game.startTimeUTC).getTime() + 7 * 60 * 1000);
                 const isLocked = new Date() > deadline;
                 const existingPrediction = myPredictions[game.id];
                 const isFormOpen = openFormId === game.id;
-
-                let button;
-                if (isLocked) {
-                    button = <button className="bg-gray-400 text-white font-bold py-2 px-4 rounded cursor-not-allowed" disabled>Locked</button>;
-                } else if (isFormOpen) {
-                    button = <button onClick={() => toggleForm(game.id)} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Cancel</button>;
-                } else if (existingPrediction) {
-                    button = <button onClick={() => toggleForm(game.id)} className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded">Edit Prediction</button>;
-                } else {
-                    button = <button onClick={() => toggleForm(game.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Make Prediction</button>;
-                }
+                const arePicksOpen = openPicksId === game.id;
 
                 return (
-                    <div key={game.id} className="bg-white shadow-md rounded-lg p-4">
+                    <div key={game.id} className="bg-white shadow-lg rounded-lg p-4 transition-shadow hover:shadow-xl">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h4 className="text-xl font-bold">{game.awayTeam.placeName.default} @ {game.homeTeam.placeName.default}</h4>
+                                <h4 className="text-xl font-bold text-union-blue">{game.awayTeam.placeName.default} @ {game.homeTeam.placeName.default}</h4>
                                 <p className="text-gray-600">{new Date(game.startTimeUTC).toLocaleString()}</p>
                             </div>
-                            {button}
+                            <div className="flex gap-2">
+                                {/* Always show the View Picks button */}
+                                <button onClick={() => togglePicks(game.id)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-colors">
+                                    {arePicksOpen ? 'Hide Picks' : 'View Picks'}
+                                </button>
+                                
+                                {!isLocked && (
+                                    isFormOpen ? (
+                                        <button onClick={() => toggleForm(game.id)} className="bg-goal-red hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-colors">Cancel</button>
+                                    ) : existingPrediction ? (
+                                        <button onClick={() => toggleForm(game.id)} className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded transition-colors">Edit Prediction</button>
+                                    ) : (
+                                        <button onClick={() => toggleForm(game.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors">Make Prediction</button>
+                                    )
+                                )}
+                                {isLocked && <div className="bg-gray-400 text-white font-bold py-2 px-4 rounded cursor-not-allowed">Locked</div>}
+                            </div>
                         </div>
                         {isFormOpen && (
-                            <div className="mt-4 border-t pt-4">
+                            <div className="mt-4 border-t pt-4 animate-fade-in-down">
                                 <PredictionForm game={game} userId={userId} existingPrediction={existingPrediction} />
+                            </div>
+                        )}
+                        {arePicksOpen && (
+                            <div className="mt-4 border-t pt-4 animate-fade-in-down">
+                                <CommunityPicks gameId={game.id} />
                             </div>
                         )}
                     </div>

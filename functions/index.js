@@ -49,3 +49,38 @@ exports.scoreYesterdayGames = onSchedule("every day 05:00", async (event) => {
     return null;
   }
 });
+
+// User Predictions
+
+app.get('/api/predictions/:gameId', async (req, res) => {
+  try {
+    const { gameId } = req.params;
+
+    // Fetch all predictions for the given game
+    const predictionsSnapshot = await db.collection('predictions').where('gameId', '==', Number(gameId)).get();
+    if (predictionsSnapshot.empty) {
+      return res.json([]);
+    }
+    const predictions = predictionsSnapshot.docs.map(doc => doc.data());
+
+    // To make the data useful, let's also fetch the usernames (emails)
+    const userIds = [...new Set(predictions.map(p => p.userId))];
+    const usersSnapshot = await db.collection('users').where(admin.firestore.FieldPath.documentId(), 'in', userIds).get();
+    const usersMap = {};
+    usersSnapshot.forEach(doc => {
+      usersMap[doc.id] = doc.data().email;
+    });
+
+    // Combine predictions with usernames
+    const populatedPredictions = predictions.map(p => ({
+      ...p,
+      email: usersMap[p.userId] || 'Unknown User'
+    }));
+
+    res.json(populatedPredictions);
+
+  } catch (error) {
+    console.error("Error fetching community predictions:", error);
+    res.status(500).send("Failed to fetch community predictions.");
+  }
+});
