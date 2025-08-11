@@ -45,7 +45,8 @@ const GameList = () => {
 
     const togglePicks = (gameId) => {
         setOpenFormId(null);
-        setOpenPicksId(prevId => (prevId === gameId ? null : prevId));
+        // --- THIS LINE IS NOW FIXED ---
+        setOpenPicksId(prevId => (prevId === gameId ? null : gameId));
     };
 
     if (loading) return <p className="text-center mt-8">Loading games...</p>;
@@ -61,7 +62,7 @@ const GameList = () => {
                 const arePicksOpen = openPicksId === game.id;
 
                 return (
-                    <div key={game.id} className="bg-white shadow-lg rounded-lg p-4 transition-shadow hover:shadow-xl">
+                    <div key={game.id} className="bg-white shadow-lg rounded-lg p-4 transition-shadow hover-shadow-xl">
                         <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                             <div className="text-center md:text-left">
                                 <h4 className="text-xl font-bold text-union-blue">{game.awayTeam.placeName.default} @ {game.homeTeam.placeName.default}</h4>
