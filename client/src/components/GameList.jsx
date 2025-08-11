@@ -17,15 +17,15 @@ const GameList = () => {
     useEffect(() => {
         const fetchGameData = async () => {
             if (!userId) {
-                const scheduleRes = await axios.get('http://localhost:3001/api/schedule');
+                const scheduleRes = await axios.get('https://cbj-prediction-app.onrender.com/api/schedule');
                 setGames(scheduleRes.data.games);
                 setLoading(false);
                 return;
             }
             try {
                 const [scheduleRes, predictionsRes] = await Promise.all([
-                    axios.get('http://localhost:3001/api/schedule'),
-                    axios.get(`http://localhost:3001/api/my-predictions/${userId}`)
+                    axios.get('https://cbj-prediction-app.onrender.com/api/schedule'),
+                    axios.get(`https://cbj-prediction-app.onrender.com/api/my-predictions/${userId}`)
                 ]);
                 setGames(scheduleRes.data.games);
                 setMyPredictions(predictionsRes.data);

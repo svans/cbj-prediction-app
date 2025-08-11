@@ -31,7 +31,6 @@ exports.scoreYesterdayGames = onSchedule("every day 05:00", async (event) => {
     // 3. Loop through each game and trigger our server's endpoint
     for (const gameId of gamePks) {
       // Note: This URL must point to your *deployed* server,
-      // not localhost, for the live function to work.
       const scoringUrl = `https://cbj-prediction-app.onrender.com/api/score-game/${gameId}`;
 
       try {
