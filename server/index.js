@@ -5,6 +5,10 @@ const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
 
+const serviceAccountConfig = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
+  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
+  : require('./serviceAccountKey.json');
+
 // Initialize Firebase Admin SDK
 const serviceAccount = require('./serviceAccountKey.json');
 admin.initializeApp({
