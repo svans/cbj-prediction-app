@@ -18,6 +18,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Health Check Route
+app.get('/', (req, res) => {
+    res.status(200).send('Server is up and running!');
+});
+
 const PORT = process.env.PORT || 3001;
 
 // --- API Endpoints ---
