@@ -12,7 +12,7 @@ const CommunityPicks = ({ gameId }) => {
         const fetchPicks = async () => {
             try {
                 // The start time is no longer needed
-                const response = await axios.get(`http://localhost:3001/api/predictions/${gameId}`);
+                const response = await axios.get(`https://cbj-prediction-app.onrender.com/api/predictions/${gameId}`);
                 setPicks(response.data);
             } catch (err) {
                 setError(err.response?.data?.message || 'Could not load predictions.');
