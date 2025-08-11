@@ -153,7 +153,7 @@ app.get('/api/leaderboard', async (req, res) => {
     }
 });
 
-// Add this inside your server/index.js file
+// Predictions
 app.post('/api/predictions', async (req, res) => {
   try {
     const { userId, gameId, prediction } = req.body; // Assuming a simple structure for now
@@ -174,6 +174,41 @@ app.post('/api/predictions', async (req, res) => {
   } catch (error) {
     console.error("Error saving prediction:", error);
     res.status(500).send("Failed to save prediction.");
+  }
+});
+
+// User Predictions
+
+app.get('/api/predictions/:gameId', async (req, res) => {
+  try {
+    const { gameId } = req.params;
+
+    // Fetch all predictions for the given game
+    const predictionsSnapshot = await db.collection('predictions').where('gameId', '==', Number(gameId)).get();
+    if (predictionsSnapshot.empty) {
+      return res.json([]);
+    }
+    const predictions = predictionsSnapshot.docs.map(doc => doc.data());
+
+    // Fetch the usernames (emails)
+    const userIds = [...new Set(predictions.map(p => p.userId))];
+    const usersSnapshot = await db.collection('users').where(admin.firestore.FieldPath.documentId(), 'in', userIds).get();
+    const usersMap = {};
+    usersSnapshot.forEach(doc => {
+      usersMap[doc.id] = doc.data().email;
+    });
+
+    // Combine predictions with usernames
+    const populatedPredictions = predictions.map(p => ({
+      ...p,
+      email: usersMap[p.userId] || 'Unknown User'
+    }));
+
+    res.json(populatedPredictions);
+
+  } catch (error) {
+    console.error("Error fetching community predictions:", error);
+    res.status(500).send("Failed to fetch community predictions.");
   }
 });
 
