@@ -205,40 +205,19 @@ app.post('/api/score-game/:gameId', async (req, res) => {
         const gameResultUrl = `https://api-web.nhle.com/v1/gamecenter/${gameId}/landing`;
         const gameResponse = await axios.get(gameResultUrl);
         const gameData = gameResponse.data;
-        // (Full scoring logic is here)
-        // ...
-        res.status(200).send(`Scoring complete for game ${gameId}.`);
-    } catch (error) {
-        console.error("Error during scoring process:", error);
-        res.status(500).send("An error occurred during scoring.");
-    }
-});
-
-// --- NEW: Simulation Endpoint ---
-app.post('/api/simulate-game/:gameId', async (req, res) => {
-    const { secret } = req.body;
-    if (secret !== SCORING_SECRET) {
-        return res.status(401).send("Unauthorized: Invalid secret.");
-    }
-
-    const { gameId } = req.params;
-    console.log(`--- RUNNING SIMULATION for gameId: ${gameId} ---`);
-
-    const fakeGameData = { /* ... (fake data from previous step) ... */ };
-
-    try {
-        const actualHomeScore = fakeGameData.homeTeam.score;
-        const actualAwayScore = fakeGameData.awayTeam.score;
-        const actualWinnerAbbrev = actualHomeScore > actualAwayScore ? fakeGameData.homeTeam.abbrev : fakeGameData.awayTeam.abbrev;
-        const actualTotalShots = fakeGameData.homeTeam.sog + fakeGameData.awayTeam.sog;
+        
+        const actualHomeScore = gameData.homeTeam.score;
+        const actualAwayScore = gameData.awayTeam.score;
+        const actualWinnerAbbrev = actualHomeScore > actualAwayScore ? gameData.homeTeam.abbrev : gameData.awayTeam.abbrev;
+        const actualTotalShots = gameData.awayTeam.sog + gameData.homeTeam.sog;
 
         let actualEndCondition = "regulation";
-        if (fakeGameData.summary.shootout.length > 0) {
+        if (gameData.summary.shootout.length > 0) {
             actualEndCondition = "shootout";
-        } else if (fakeGameData.periodDescriptor.periodType === "OT") {
+        } else if (gameData.periodDescriptor.periodType === "OT") {
             actualEndCondition = "overtime";
         } else {
-            const lastGoal = fakeGameData.summary.scoring.flatMap(p => p.goals).pop();
+            const lastGoal = gameData.summary.scoring.flatMap(p => p.goals).pop();
             if (lastGoal && lastGoal.goalModifier === "empty-net") {
                 actualEndCondition = "regulation-en";
             }
@@ -246,14 +225,13 @@ app.post('/api/simulate-game/:gameId', async (req, res) => {
 
         const predictionsSnapshot = await db.collection('predictions').where('gameId', '==', Number(gameId)).get();
         if (predictionsSnapshot.empty) {
-            return res.send("SIMULATION finished: No predictions to score.");
+            return res.send("Scoring finished: No predictions to score.");
         }
         const predictions = predictionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         const userPoints = {};
         const initUser = (userId) => { if (!userPoints[userId]) userPoints[userId] = 0; };
 
-        // --- COMPLETE SCORING LOGIC ADDED HERE ---
         const correctWinnerPredictions = predictions.filter(p => p.prediction.winningTeam === actualWinnerAbbrev);
         let closestScoreDiff = Infinity;
         let closestScoreWinners = [];
@@ -320,16 +298,14 @@ app.post('/api/simulate-game/:gameId', async (req, res) => {
         for (const userId in userPoints) {
             const userDocRef = db.collection('users').doc(userId);
             batch.update(userDocRef, { totalScore: admin.firestore.FieldValue.increment(userPoints[userId]) });
-            console.log(`Awarding ${userPoints[userId]} points to user ${userId} in simulation.`);
+            console.log(`Awarding ${userPoints[userId]} points to user ${userId}.`);
         }
         await batch.commit();
         
-        console.log("--- SIMULATION COMPLETE ---");
-        res.status(200).send(`Simulation complete for game ${gameId}.`);
-
+        res.status(200).send(`Scoring complete for game ${gameId}.`);
     } catch (error) {
-        console.error("Error during SIMULATION process:", error);
-        res.status(500).send("An error occurred during simulation.");
+        console.error("Error during scoring process:", error);
+        res.status(500).send("An error occurred during scoring.");
     }
 });
 
