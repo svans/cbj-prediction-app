@@ -11,7 +11,7 @@ const ResultsPage = () => {
     useEffect(() => {
         const fetchResults = async () => {
             try {
-                const response = await axios.get('http://localhost:3001/api/results');
+                const response = await axios.get('https://cbj-prediction-app.onrender.com/api/results');
                 setResults(response.data.games);
             } catch (err) {
                 setError('Could not load game results.');

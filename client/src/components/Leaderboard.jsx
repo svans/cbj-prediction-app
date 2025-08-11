@@ -10,7 +10,7 @@ const Leaderboard = () => {
     useEffect(() => {
         const fetchLeaderboard = async () => {
             try {
-                const response = await axios.get('http://localhost:3001/api/leaderboard');
+                const response = await axios.get('https://cbj-prediction-app.onrender.com/api/leaderboard');
                 setLeaderboardData(response.data);
                 setError('');
             } catch (err) {

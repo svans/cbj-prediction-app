@@ -61,7 +61,7 @@ const PredictionForm = ({ game, userId, existingPrediction }) => {
         const fetchRoster = async () => {
             setLoadingRoster(true);
             try {
-                const response = await axios.get(`http://localhost:3001/api/roster/${winningTeam}`);
+                const response = await axios.get(`https://cbj-prediction-app.onrender.com/api/roster/${winningTeam}`);
                 setRoster([...response.data.forwards, ...response.data.defensemen]);
             } catch (error) {
                 setMessage('Error fetching player list.');
@@ -78,7 +78,7 @@ const PredictionForm = ({ game, userId, existingPrediction }) => {
         setMessage('Submitting your prediction...');
         const prediction = { winningTeam, gwgScorer, score: `${awayScore}-${homeScore}`, endCondition, totalShots: Number(totalShots) };
         try {
-            await axios.post('http://localhost:3001/api/predictions', {
+            await axios.post('https://cbj-prediction-app.onrender.com/api/predictions', {
                 userId,
                 gameId: game.id,
                 prediction,

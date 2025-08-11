@@ -10,14 +10,13 @@ const GameList = () => {
     const [loading, setLoading] = useState(true);
     const [openFormId, setOpenFormId] = useState(null);
     const [myPredictions, setMyPredictions] = useState({}); // <-- State for user's predictions
-
     const userId = auth.currentUser?.uid;
 
     useEffect(() => {
         const fetchGameData = async () => {
             if (!userId) {
                 // If user is not logged in, just fetch the schedule
-                const scheduleRes = await axios.get('http://localhost:3001/api/schedule');
+                const scheduleRes = await axios.get('https://cbj-prediction-app.onrender.com/api/schedule');
                 setGames(scheduleRes.data.games);
                 setLoading(false);
                 return;
@@ -26,8 +25,8 @@ const GameList = () => {
             // If user is logged in, fetch both schedule and their predictions
             try {
                 const [scheduleRes, predictionsRes] = await Promise.all([
-                    axios.get('http://localhost:3001/api/schedule'),
-                    axios.get(`http://localhost:3001/api/my-predictions/${userId}`)
+                    axios.get('https://cbj-prediction-app.onrender.com/api/schedule'),
+                    axios.get(`https://cbj-prediction-app.onrender.com/api/my-predictions/${userId}`)
                 ]);
                 setGames(scheduleRes.data.games);
                 setMyPredictions(predictionsRes.data);
