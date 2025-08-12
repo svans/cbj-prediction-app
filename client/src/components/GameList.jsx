@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import PredictionForm from './PredictionForm';
-import PredictionView from './PredictionView'; // Import the new component
+import PredictionView from './PredictionView';
 import CommunityPicks from './CommunityPicks';
 import { auth } from '../firebase';
 
@@ -15,8 +15,35 @@ const GameList = () => {
     const userId = auth.currentUser?.uid;
 
     useEffect(() => {
-        // ... (fetchGameData logic remains the same) ...
-    }, [userId]);
+        // --- THIS IS THE MISSING LOGIC ---
+        const fetchGameData = async () => {
+            setLoading(true);
+            const scheduleUrl = 'https://cbj-prediction-app.onrender.com/api/schedule';
+            const myPredictionsUrl = `https://cbj-prediction-app.onrender.com/api/my-predictions/${userId}`;
+
+            try {
+                if (userId) {
+                    // If user is logged in, fetch both schedule and their predictions
+                    const [scheduleRes, predictionsRes] = await Promise.all([
+                        axios.get(scheduleUrl),
+                        axios.get(myPredictionsUrl)
+                    ]);
+                    setGames(scheduleRes.data.games);
+                    setMyPredictions(predictionsRes.data);
+                } else {
+                    // If user is not logged in, just fetch the schedule
+                    const scheduleRes = await axios.get(scheduleUrl);
+                    setGames(scheduleRes.data.games);
+                }
+            } catch (error) {
+                console.error("Error fetching game data!", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchGameData();
+    }, [userId]); // Re-run when the user logs in or out
 
     const toggleForm = (gameId) => {
         setOpenPicksId(null);
