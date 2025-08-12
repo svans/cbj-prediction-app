@@ -11,6 +11,8 @@ export default {
         'union-blue': '#002654',
         'goal-red': '#CE1126',
         'star-silver': '#A2AAAD',
+        'ice-white': '#FFFFFF',
+        'slate-gray': '#4A5568',
       },
       keyframes: {
         'fade-in-down': {

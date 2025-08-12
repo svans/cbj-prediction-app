@@ -52,9 +52,23 @@ app.get('/api/schedule', async (req, res) => {
         const response = await axios.get(url);
         const allGames = response.data.games;
         const now = new Date();
-        const upcomingGames = allGames.filter(game => new Date(game.startTimeUTC) > now);
-        const nextFiveGames = upcomingGames.slice(0, 5);
-        res.json({ games: nextFiveGames });
+
+        // Try to find upcoming games first
+        let gamesToShow = allGames.filter(game => new Date(game.startTimeUTC) > now);
+
+        // If no upcoming games are found (i.e., it's the offseason)
+        if (gamesToShow.length === 0) {
+            console.log("No upcoming games found. Showing last 5 played games instead.");
+            // Filter for games in the past
+            const pastGames = allGames.filter(game => new Date(game.startTimeUTC) < now);
+            // Sort to get the most recent ones, then take the last 5
+            gamesToShow = pastGames.sort((a, b) => new Date(b.startTimeUTC) - new Date(a.startTimeUTC)).slice(0, 5);
+        } else {
+            // If there are upcoming games, just take the next 5
+            gamesToShow = gamesToShow.slice(0, 5);
+        }
+
+        res.json({ games: gamesToShow });
     } catch (error) {
         console.error("Error fetching schedule:", error);
         res.status(500).send("Failed to fetch NHL schedule.");
