@@ -41,21 +41,19 @@ app.get('/', (req, res) => {
     res.status(200).send('Server is up and running!');
 });
 
-// Get Upcoming Games (with offseason logic)
+// Get Upcoming Games (with updated logic)
 app.get('/api/schedule', async (req, res) => {
     try {
         const url = 'https://api-web.nhle.com/v1/club-schedule-season/CBJ/now';
         const response = await axios.get(url);
         const allGames = response.data.games;
-        const now = new Date();
-        let gamesToShow = allGames.filter(game => new Date(game.startTimeUTC) > now);
-        if (gamesToShow.length === 0) {
-            const pastGames = allGames.filter(game => new Date(game.startTimeUTC) < now);
-            gamesToShow = pastGames.sort((a, b) => new Date(b.startTimeUTC) - new Date(a.startTimeUTC)).slice(0, 5);
-        } else {
-            gamesToShow = gamesToShow.slice(0, 5);
-        }
-        res.json({ games: gamesToShow });
+
+        const today = new Date();
+        const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        const upcomingGames = allGames.filter(game => game.gameDate >= todayString);
+
+        res.json({ games: upcomingGames });
     } catch (error) {
         console.error("Error fetching schedule:", error);
         res.status(500).send("Failed to fetch NHL schedule.");
@@ -136,7 +134,7 @@ app.get('/api/predictions/:gameId', async (req, res) => {
         const usersSnapshot = await db.collection('users').where(admin.firestore.FieldPath.documentId(), 'in', userIds).get();
         const usersMap = {};
         usersSnapshot.forEach(doc => { 
-            usersMap[doc.id] = doc.data().username || doc.data().email; // Use username, fallback to email
+            usersMap[doc.id] = doc.data().username || doc.data().email;
         });
 
         const populatedPredictions = predictions.map(p => ({ 
@@ -222,13 +220,11 @@ app.post('/api/score-game/:gameId', async (req, res) => {
         const gameResponse = await axios.get(gameResultUrl);
         const gameData = gameResponse.data;
         
-        // --- UPDATED SCORING LOGIC ---
         const actualHomeScore = gameData.homeTeam.score;
         const actualAwayScore = gameData.awayTeam.score;
         const actualWinnerAbbrev = actualHomeScore > actualAwayScore ? gameData.homeTeam.abbrev : gameData.awayTeam.abbrev;
         const actualTotalShots = gameData.awayTeam.sog + gameData.homeTeam.sog;
 
-        // Determine actual game end condition (Regulation, OT, or Shootout)
         let actualEndCondition = "regulation";
         if (gameData.summary.shootout.length > 0) {
             actualEndCondition = "shootout";
@@ -236,12 +232,9 @@ app.post('/api/score-game/:gameId', async (req, res) => {
             actualEndCondition = "overtime";
         }
 
-        // Determine if the final goal was an empty-netter
         const lastGoal = gameData.summary.scoring.flatMap(p => p.goals).pop();
         const actualIsEmptyNet = lastGoal?.goalModifier === "empty-net";
         
-        // --- END OF UPDATED LOGIC ---
-
         const predictionsSnapshot = await db.collection('predictions').where('gameId', '==', Number(gameId)).get();
         if (predictionsSnapshot.empty) {
             return res.send("Scoring finished: No predictions to score.");
@@ -287,23 +280,20 @@ app.post('/api/score-game/:gameId', async (req, res) => {
             const predictedEnd = p.prediction.endCondition;
             const predictedIsEmptyNet = p.prediction.isEmptyNet;
 
-            // Score the end condition (Regulation/OT/Shootout)
             if (predictedEnd === actualEndCondition) {
                 if (predictedEnd === "shootout") userPoints[p.userId] += 5;
                 else if (predictedEnd === "overtime") userPoints[p.userId] += 3;
                 else if (predictedEnd === "regulation") userPoints[p.userId] += 1;
             }
 
-            // Score the "Empty Net" checkbox as a separate bet
             if (predictedIsEmptyNet) {
                 if (actualIsEmptyNet) {
-                    userPoints[p.userId] += 2; // Correctly guessed empty net
+                    userPoints[p.userId] += 2;
                 } else {
-                    userPoints[p.userId] -= 2; // Incorrectly guessed empty net (penalty)
+                    userPoints[p.userId] -= 2;
                 }
             }
 
-            // Score shots on goal
             if (predictedShots === actualTotalShots) {
                 exactShotWinner = p.userId;
             } else {
