@@ -1,4 +1,4 @@
-// client/src/components/PredictionForm.jsx
+/ client/src/components/PredictionForm.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { getFirestore, doc, onSnapshot } from 'firebase/firestore';
@@ -35,7 +35,7 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
             setEndCondition(currentPrediction.endCondition || 'regulation');
             setTotalShots(currentPrediction.totalShots || 0);
         }
-    }, [existingPrediction]); // Depend on the original prop to re-trigger pre-fill
+    }, [existingPrediction]);
 
     useEffect(() => {
         const db = getFirestore();
@@ -89,7 +89,8 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
         }
     };
 
-    const isShotsTaken = takenShotTotals.includes(Number(totalShots)) && Number(totalShots) !== currentPrediction?.totalShots;
+    // --- UPDATED LOGIC FOR SHOTS VALIDATION ---
+    const isShotTotalTakenByOther = takenShotTotals.includes(Number(totalShots)) && Number(totalShots) !== currentPrediction?.totalShots;
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4 mt-6 border-t border-slate-gray pt-6 animate-fade-in-down">
@@ -141,11 +142,11 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
                 <div className="md:col-span-2">
                     <label className={labelStyle}>Total Shots on Goal (Both Teams):</label>
                     <input type="number" value={totalShots} onChange={(e) => setTotalShots(e.target.value)} min="0" className={inputStyle} />
-                    {isShotsTaken && <p className="text-red-500 text-sm mt-1">This shot total has already been taken.</p>}
+                    {isShotTotalTakenByOther && <p className="text-red-500 text-sm mt-1">This shot total has already been taken.</p>}
                 </div>
             </div>
             <div className="flex justify-center mt-6">
-                <button type="submit" disabled={isSubmitting || !winningTeam || !gwgScorer || isShotsTaken} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-8 rounded disabled:bg-gray-400">
+                <button type="submit" disabled={isSubmitting || !winningTeam || !gwgScorer || isShotTotalTakenByOther} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-8 rounded disabled:bg-gray-400">
                     Save Your Predictions
                 </button>
             </div>
