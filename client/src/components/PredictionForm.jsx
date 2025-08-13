@@ -10,32 +10,38 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
     const [homeScore, setHomeScore] = useState(0);
     const [awayScore, setAwayScore] = useState(0);
     const [endCondition, setEndCondition] = useState('regulation');
+    const [isEmptyNet, setIsEmptyNet] = useState(false);
     const [totalShots, setTotalShots] = useState(0);
     const [loadingRoster, setLoadingRoster] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [message, setMessage] = useState('');
     const [takenScorers, setTakenScorers] = useState([]);
     const [takenShotTotals, setTakenShotTotals] = useState([]);
+    const [showAnimation, setShowAnimation] = useState(false);
 
     const inputStyle = "mt-1 block w-full px-3 py-2 bg-slate-gray border border-star-silver rounded-md shadow-sm text-ice-white focus:outline-none focus:ring-2 focus:ring-goal-red";
     const labelStyle = "block text-sm font-bold text-star-silver";
 
     const currentPrediction = existingPrediction?.prediction || existingPrediction;
 
+    // Pre-fill the form when editing an existing prediction
     useEffect(() => {
         if (currentPrediction) {
-            if (currentPrediction.score && typeof currentPrediction.score === 'string') {
-                const [away, home] = currentPrediction.score.split('-').map(Number);
+            const { score, winningTeam, gwgScorer, endCondition, isEmptyNet, totalShots } = currentPrediction;
+            if (score && typeof score === 'string') {
+                const [away, home] = score.split('-').map(Number);
                 setAwayScore(away || 0);
                 setHomeScore(home || 0);
             }
-            setWinningTeam(currentPrediction.winningTeam || '');
-            setGwgScorer(currentPrediction.gwgScorer || '');
-            setEndCondition(currentPrediction.endCondition || 'regulation');
-            setTotalShots(currentPrediction.totalShots || 0);
+            setWinningTeam(winningTeam || '');
+            setGwgScorer(gwgScorer || '');
+            setEndCondition(endCondition || 'regulation');
+            setIsEmptyNet(isEmptyNet || false);
+            setTotalShots(totalShots || 0);
         }
     }, [existingPrediction]);
 
+    // Listen for real-time updates on taken picks
     useEffect(() => {
         const db = getFirestore();
         const gamePicksRef = doc(db, "gamePicks", String(game.id));
@@ -47,6 +53,7 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
         return () => unsubscribe();
     }, [game.id]);
 
+    // Fetch the roster when a winning team is selected
     useEffect(() => {
         if (!winningTeam) {
             setRoster([]);
@@ -66,27 +73,44 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
         fetchRoster();
     }, [winningTeam]);
 
+    // Handle form submission
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
         setMessage('Submitting...');
-        const prediction = { winningTeam, gwgScorer, score: `${awayScore}-${homeScore}`, endCondition, totalShots: Number(totalShots) };
+        const prediction = { 
+            winningTeam, 
+            gwgScorer, 
+            score: `${awayScore}-${homeScore}`, 
+            endCondition, 
+            isEmptyNet,
+            totalShots: Number(totalShots) 
+        };
         try {
             await axios.post('https://cbj-prediction-app.onrender.com/api/predictions', {
-                userId,
-                gameId: game.id,
-                prediction,
-                startTimeUTC: game.startTimeUTC
+                userId, gameId: game.id, prediction, startTimeUTC: game.startTimeUTC
             });
-            setMessage('Prediction saved successfully!');
-            setTimeout(() => closeForm(), 1500);
+            setShowAnimation(true);
+            setTimeout(() => {
+                setShowAnimation(false);
+                closeForm();
+            }, 2500);
         } catch (error) {
-            const errorMessage = error.response?.data?.message || 'Failed to save prediction.';
-            setMessage(errorMessage);
+            setMessage(error.response?.data?.message || 'Failed to save prediction.');
         } finally {
             setIsSubmitting(false);
         }
     };
+
+    // Show animation on successful submission
+    if (showAnimation) {
+        return (
+            <div className="text-center p-8 animate-fade-in-down">
+                <div className="puck-animation"></div>
+                <p className="text-2xl font-bold text-ice-white mt-4">Prediction Saved!</p>
+            </div>
+        );
+    }
 
     const isShotTotalTakenByOther = takenShotTotals.includes(Number(totalShots)) && Number(totalShots) !== currentPrediction?.totalShots;
 
@@ -132,7 +156,6 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
                     <label className={labelStyle}>Game Ends In:</label>
                     <select value={endCondition} onChange={(e) => setEndCondition(e.target.value)} className={inputStyle}>
                         <option value="regulation">Regulation</option>
-                        <option value="regulation-en">Regulation + Empty Net</option>
                         <option value="overtime">Overtime</option>
                         <option value="shootout">Shootout</option>
                     </select>
@@ -141,6 +164,10 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
                     <label className={labelStyle}>Total Shots on Goal (Both Teams):</label>
                     <input type="number" value={totalShots} onChange={(e) => setTotalShots(e.target.value)} min="0" className={inputStyle} />
                     {isShotTotalTakenByOther && <p className="text-red-500 text-sm mt-1">This shot total has already been taken.</p>}
+                </div>
+                <div className="md:col-span-2 flex items-center justify-center">
+                    <input id="empty-net" type="checkbox" checked={isEmptyNet} onChange={(e) => setIsEmptyNet(e.target.checked)} className="h-4 w-4 text-goal-red bg-slate-gray border-star-silver rounded focus:ring-goal-red" />
+                    <label htmlFor="empty-net" className="ml-2 block text-sm font-bold text-star-silver">Final Goal is Empty Net?</label>
                 </div>
             </div>
             <div className="flex justify-center mt-6">

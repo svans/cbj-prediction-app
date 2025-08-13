@@ -69,9 +69,7 @@ app.get('/api/results', async (req, res) => {
         const response = await axios.get(url);
         const allGames = response.data.games;
         const now = new Date();
-        
-        let pastGames = allGames.filter(game => new Date(game.startTimeUTC) < now);
-        
+        const pastGames = allGames.filter(game => new Date(game.startTimeUTC) < now);
         pastGames.sort((a, b) => new Date(b.startTimeUTC) - new Date(a.startTimeUTC));
         res.json({ games: pastGames });
     } catch (error) {
@@ -137,9 +135,14 @@ app.get('/api/predictions/:gameId', async (req, res) => {
 
         const usersSnapshot = await db.collection('users').where(admin.firestore.FieldPath.documentId(), 'in', userIds).get();
         const usersMap = {};
-        usersSnapshot.forEach(doc => { usersMap[doc.id] = doc.data().email; });
+        usersSnapshot.forEach(doc => { 
+            usersMap[doc.id] = doc.data().username || doc.data().email; // Use username, fallback to email
+        });
 
-        const populatedPredictions = predictions.map(p => ({ ...p, email: usersMap[p.userId] || 'Unknown User' }));
+        const populatedPredictions = predictions.map(p => ({ 
+            ...p, 
+            username: usersMap[p.userId] || 'Unknown User' 
+        }));
         res.json(populatedPredictions);
     } catch (error) {
         console.error("Error fetching community predictions:", error);
@@ -219,22 +222,25 @@ app.post('/api/score-game/:gameId', async (req, res) => {
         const gameResponse = await axios.get(gameResultUrl);
         const gameData = gameResponse.data;
         
+        // --- UPDATED SCORING LOGIC ---
         const actualHomeScore = gameData.homeTeam.score;
         const actualAwayScore = gameData.awayTeam.score;
         const actualWinnerAbbrev = actualHomeScore > actualAwayScore ? gameData.homeTeam.abbrev : gameData.awayTeam.abbrev;
         const actualTotalShots = gameData.awayTeam.sog + gameData.homeTeam.sog;
 
+        // Determine actual game end condition (Regulation, OT, or Shootout)
         let actualEndCondition = "regulation";
         if (gameData.summary.shootout.length > 0) {
             actualEndCondition = "shootout";
         } else if (gameData.periodDescriptor.periodType === "OT") {
             actualEndCondition = "overtime";
-        } else {
-            const lastGoal = gameData.summary.scoring.flatMap(p => p.goals).pop();
-            if (lastGoal && lastGoal.goalModifier === "empty-net") {
-                actualEndCondition = "regulation-en";
-            }
         }
+
+        // Determine if the final goal was an empty-netter
+        const lastGoal = gameData.summary.scoring.flatMap(p => p.goals).pop();
+        const actualIsEmptyNet = lastGoal?.goalModifier === "empty-net";
+        
+        // --- END OF UPDATED LOGIC ---
 
         const predictionsSnapshot = await db.collection('predictions').where('gameId', '==', Number(gameId)).get();
         if (predictionsSnapshot.empty) {
@@ -279,15 +285,25 @@ app.post('/api/score-game/:gameId', async (req, res) => {
             initUser(p.userId);
             const predictedShots = Number(p.prediction.totalShots);
             const predictedEnd = p.prediction.endCondition;
+            const predictedIsEmptyNet = p.prediction.isEmptyNet;
+
+            // Score the end condition (Regulation/OT/Shootout)
             if (predictedEnd === actualEndCondition) {
                 if (predictedEnd === "shootout") userPoints[p.userId] += 5;
                 else if (predictedEnd === "overtime") userPoints[p.userId] += 3;
-                else if (predictedEnd === "regulation-en") userPoints[p.userId] += 2;
                 else if (predictedEnd === "regulation") userPoints[p.userId] += 1;
-            } else if (predictedEnd === "regulation-en" && actualEndCondition !== "regulation-en") {
-                userPoints[p.userId] -= 2;
             }
 
+            // Score the "Empty Net" checkbox as a separate bet
+            if (predictedIsEmptyNet) {
+                if (actualIsEmptyNet) {
+                    userPoints[p.userId] += 2; // Correctly guessed empty net
+                } else {
+                    userPoints[p.userId] -= 2; // Incorrectly guessed empty net (penalty)
+                }
+            }
+
+            // Score shots on goal
             if (predictedShots === actualTotalShots) {
                 exactShotWinner = p.userId;
             } else {

@@ -105,15 +105,19 @@ const GameList = () => {
                     }
 
                     return (
-                        <div key={game.id} className="bg-slate-gray/50 border border-slate-gray rounded-lg p-4 md:p-6">
-                            <div className="flex justify-center items-center gap-4 md:gap-8">
-                                <img src={game.awayTeam.darkLogo} alt={game.awayTeam.placeName.default} className="h-12 w-12 md:h-16 md:w-16" />
-                                <div className="text-center">
-                                    <p className="text-lg md:text-xl font-bold">AT</p>
-                                    <p className="text-xs md:text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleDateString([], { month: 'long', day: 'numeric' })}</p>
-                                    <p className="text-xs md:text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        <div key={game.id} className="bg-slate-gray/50 border border-slate-gray rounded-lg p-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4 text-lg font-bold">
+                                    <img src={game.awayTeam.darkLogo} alt="" className="h-10 w-10" />
+                                    <span>{game.awayTeam.placeName.default}</span>
                                 </div>
-                                <img src={game.homeTeam.darkLogo} alt={game.homeTeam.placeName.default} className="h-12 w-12 md:h-16 md:w-16" />
+                                <div className="text-center">
+                                    <p className="text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                </div>
+                                <div className="flex items-center gap-4 text-lg font-bold">
+                                    <span>{game.homeTeam.placeName.default}</span>
+                                    <img src={game.homeTeam.darkLogo} alt="" className="h-10 w-10" />
+                                </div>
                             </div>
 
                             {existingPrediction && !isFormOpen && <PredictionView prediction={existingPrediction} scorerName={scorerName} />}

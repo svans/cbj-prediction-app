@@ -2,54 +2,52 @@
 import React, { useState } from 'react';
 import { auth } from '../firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-// Import Firestore methods
 import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 
 const Auth = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [username, setUsername] = useState(''); // <-- New state for username
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isLoginView, setIsLoginView] = useState(true); // State to toggle between login/signup
 
     const inputStyle = "appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-goal-red focus:border-transparent";
 
-    const handleSubmit = async (e, type) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
         setError('');
         const db = getFirestore();
 
         try {
-            if (type === 'signup') {
+            if (!isLoginView) { // Sign-up logic
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
 
-                // Create a user document in Firestore after sign-up
                 const userDocRef = doc(db, "users", user.uid);
                 await setDoc(userDocRef, {
                     email: user.email,
-                    totalScore: 0, // Initialize score to 0
+                    username: username, // <-- Save the new username
+                    totalScore: 0,
                     userId: user.uid
                 });
 
-            } else { // This is the 'signin' logic
+            } else { // Sign-in logic
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
-
-                // --- NEW: Check for and create user doc for existing users on sign-in ---
                 const userDocRef = doc(db, "users", user.uid);
                 const docSnap = await getDoc(userDocRef);
 
                 if (!docSnap.exists()) {
-                    // If the user document doesn't exist, create it.
                     console.log("User document not found, creating one for existing user.");
                     await setDoc(userDocRef, {
                         email: user.email,
+                        username: user.email.split('@')[0], // Fallback username
                         totalScore: 0,
                         userId: user.uid
                     });
                 }
-                // --- End of new code ---
             }
         } catch (err) {
             setError(err.message.replace('Firebase: ', ''));
@@ -61,14 +59,19 @@ const Auth = () => {
     return (
         <div className="bg-white shadow-lg rounded-lg p-8 space-y-6">
             <h2 className="text-center text-3xl font-extrabold text-union-blue">
-                Sign in or create an account
+                {isLoginView ? 'Sign in to your account' : 'Create a new account'}
             </h2>
-            <form className="space-y-6">
-                <input type="hidden" name="remember" defaultValue="true" />
+            <form onSubmit={handleSubmit} className="space-y-6">
+                {!isLoginView && (
+                    <div>
+                        <label htmlFor="username" className="sr-only">Username</label>
+                        <input id="username" name="username" type="text" required value={username} onChange={(e) => setUsername(e.target.value)} className={`${inputStyle} rounded-t-md`} placeholder="Username" />
+                    </div>
+                )}
                 <div className="rounded-md shadow-sm -space-y-px">
                     <div>
                         <label htmlFor="email-address" className="sr-only">Email address</label>
-                        <input id="email-address" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={`${inputStyle} rounded-t-md`} placeholder="Email address" />
+                        <input id="email-address" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={`${isLoginView ? 'rounded-t-md' : ''} ${inputStyle}`} placeholder="Email address" />
                     </div>
                     <div>
                         <label htmlFor="password" className="sr-only">Password</label>
@@ -78,15 +81,18 @@ const Auth = () => {
 
                 {error && <p className="text-sm text-goal-red text-center">{error}</p>}
 
-                <div className="flex gap-4">
-                    <button onClick={(e) => handleSubmit(e, 'signin')} disabled={isSubmitting} className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-union-blue hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400">
-                        Sign In
-                    </button>
-                    <button onClick={(e) => handleSubmit(e, 'signup')} disabled={isSubmitting} className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-goal-red hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-400">
-                        Sign Up
+                <div>
+                    <button type="submit" disabled={isSubmitting} className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-union-blue hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400">
+                        {isLoginView ? 'Sign In' : 'Sign Up'}
                     </button>
                 </div>
             </form>
+            <p className="text-center text-sm text-gray-600">
+                {isLoginView ? "Don't have an account?" : "Already have an account?"}
+                <button onClick={() => setIsLoginView(!isLoginView)} className="font-medium text-blue-600 hover:text-blue-500 ml-1">
+                    {isLoginView ? 'Sign up' : 'Sign in'}
+                </button>
+            </p>
         </div>
     );
 };
