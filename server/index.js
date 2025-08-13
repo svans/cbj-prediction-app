@@ -18,8 +18,6 @@ const db = admin.firestore();
 
 // --- Express App Setup ---
 const app = express();
-
-// --- NEW: CORS Configuration for Production ---
 const allowedOrigins = ['http://localhost:5173', 'https://cbj-prediction-app-5c396.web.app'];
 const corsOptions = {
   origin: (origin, callback) => {
@@ -31,8 +29,6 @@ const corsOptions = {
   }
 };
 app.use(cors(corsOptions));
-// --- End of New CORS Configuration ---
-
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
@@ -45,29 +41,20 @@ app.get('/', (req, res) => {
     res.status(200).send('Server is up and running!');
 });
 
-// Get Upcoming Games
+// Get Upcoming Games (with offseason logic)
 app.get('/api/schedule', async (req, res) => {
     try {
         const url = 'https://api-web.nhle.com/v1/club-schedule-season/CBJ/now';
         const response = await axios.get(url);
         const allGames = response.data.games;
         const now = new Date();
-
-        // Try to find upcoming games first
         let gamesToShow = allGames.filter(game => new Date(game.startTimeUTC) > now);
-
-        // If no upcoming games are found (i.e., it's the offseason)
         if (gamesToShow.length === 0) {
-            console.log("No upcoming games found. Showing last 5 played games instead.");
-            // Filter for games in the past
             const pastGames = allGames.filter(game => new Date(game.startTimeUTC) < now);
-            // Sort to get the most recent ones, then take the last 5
             gamesToShow = pastGames.sort((a, b) => new Date(b.startTimeUTC) - new Date(a.startTimeUTC)).slice(0, 5);
         } else {
-            // If there are upcoming games, just take the next 5
             gamesToShow = gamesToShow.slice(0, 5);
         }
-
         res.json({ games: gamesToShow });
     } catch (error) {
         console.error("Error fetching schedule:", error);
@@ -140,21 +127,17 @@ app.get('/api/predictions/:gameId', async (req, res) => {
     try {
         const { gameId } = req.params;
         const predictionsSnapshot = await db.collection('predictions').where('gameId', '==', Number(gameId)).get();
-        if (predictionsSnapshot.empty) {
-            return res.json([]);
-        }
+        if (predictionsSnapshot.empty) return res.json([]);
+        
         const predictions = predictionsSnapshot.docs.map(doc => doc.data());
         const userIds = [...new Set(predictions.map(p => p.userId))];
         if (userIds.length === 0) return res.json([]);
+
         const usersSnapshot = await db.collection('users').where(admin.firestore.FieldPath.documentId(), 'in', userIds).get();
         const usersMap = {};
-        usersSnapshot.forEach(doc => {
-            usersMap[doc.id] = doc.data().email;
-        });
-        const populatedPredictions = predictions.map(p => ({
-            ...p,
-            email: usersMap[p.userId] || 'Unknown User'
-        }));
+        usersSnapshot.forEach(doc => { usersMap[doc.id] = doc.data().email; });
+
+        const populatedPredictions = predictions.map(p => ({ ...p, email: usersMap[p.userId] || 'Unknown User' }));
         res.json(populatedPredictions);
     } catch (error) {
         console.error("Error fetching community predictions:", error);
@@ -334,6 +317,135 @@ app.post('/api/score-game/:gameId', async (req, res) => {
     } catch (error) {
         console.error("Error during scoring process:", error);
         res.status(500).send("An error occurred during scoring.");
+    }
+});
+
+// --- SIMULATION Endpoint ---
+app.post('/api/simulate-game/:gameId', async (req, res) => {
+    const { secret } = req.body;
+    if (secret !== SCORING_SECRET) {
+        return res.status(401).send("Unauthorized: Invalid secret.");
+    }
+    const { gameId } = req.params;
+    console.log(`--- RUNNING SIMULATION for gameId: ${gameId} ---`);
+
+    const fakeGameData = {
+        homeTeam: { abbrev: "CBJ", score: 5, sog: 35 },
+        awayTeam: { abbrev: "PIT", score: 2, sog: 28 },
+        periodDescriptor: { periodType: "REG" },
+        summary: {
+            shootout: [],
+            scoring: [
+                { goals: [{ teamAbbrev: { default: "CBJ" }, playerId: 8477986 }, { teamAbbrev: { default: "PIT" }, playerId: 8471675 }] },
+                { goals: [{ teamAbbrev: { default: "CBJ" }, playerId: 8482660 }, { teamAbbrev: { default: "CBJ" }, playerId: 8476432 }] },
+                { goals: [{ teamAbbrev: { default: "PIT" }, playerId: 8471675 }, { teamAbbrev: { default: "CBJ" }, playerId: 8477986 }, { teamAbbrev: { default: "CBJ" }, playerId: 8477456, goalModifier: "empty-net" }] }
+            ]
+        }
+    };
+
+    try {
+        const actualHomeScore = fakeGameData.homeTeam.score;
+        const actualAwayScore = fakeGameData.awayTeam.score;
+        const actualWinnerAbbrev = actualHomeScore > actualAwayScore ? fakeGameData.homeTeam.abbrev : fakeGameData.awayTeam.abbrev;
+        const actualTotalShots = fakeGameData.homeTeam.sog + fakeGameData.awayTeam.sog;
+
+        let actualEndCondition = "regulation";
+        if (fakeGameData.summary.shootout.length > 0) {
+            actualEndCondition = "shootout";
+        } else if (fakeGameData.periodDescriptor.periodType === "OT") {
+            actualEndCondition = "overtime";
+        } else {
+            const lastGoal = fakeGameData.summary.scoring.flatMap(p => p.goals).pop();
+            if (lastGoal && lastGoal.goalModifier === "empty-net") {
+                actualEndCondition = "regulation-en";
+            }
+        }
+
+        const predictionsSnapshot = await db.collection('predictions').where('gameId', '==', Number(gameId)).get();
+        if (predictionsSnapshot.empty) {
+            return res.send("SIMULATION finished: No predictions to score.");
+        }
+        const predictions = predictionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        const userPoints = {};
+        const initUser = (userId) => { if (!userPoints[userId]) userPoints[userId] = 0; };
+
+        const correctWinnerPredictions = predictions.filter(p => p.prediction.winningTeam === actualWinnerAbbrev);
+        let closestScoreDiff = Infinity;
+        let closestScoreWinners = [];
+
+        correctWinnerPredictions.forEach(p => {
+            initUser(p.userId);
+            const [pAway, pHome] = p.prediction.score.split('-').map(Number);
+            if (pAway === actualAwayScore && pHome === actualHomeScore) {
+                userPoints[p.userId] += 5;
+            } else {
+                const diff = Math.abs(pAway - actualAwayScore) + Math.abs(pHome - actualHomeScore);
+                if (diff < closestScoreDiff) {
+                    closestScoreDiff = diff;
+                    closestScoreWinners = [p.userId];
+                } else if (diff === closestScoreDiff) {
+                    closestScoreWinners.push(p.userId);
+                }
+            }
+        });
+
+        if (closestScoreWinners.length === 1) {
+            userPoints[closestScoreWinners[0]] += 2;
+        } else if (closestScoreWinners.length > 1) {
+            closestScoreWinners.forEach(userId => userPoints[userId] += 1);
+        }
+
+        let closestShotDiff = Infinity;
+        let closestShotWinners = [];
+        let exactShotWinner = null;
+
+        predictions.forEach(p => {
+            initUser(p.userId);
+            const predictedShots = Number(p.prediction.totalShots);
+            const predictedEnd = p.prediction.endCondition;
+            if (predictedEnd === actualEndCondition) {
+                if (predictedEnd === "shootout") userPoints[p.userId] += 5;
+                else if (predictedEnd === "overtime") userPoints[p.userId] += 3;
+                else if (predictedEnd === "regulation-en") userPoints[p.userId] += 2;
+                else if (predictedEnd === "regulation") userPoints[p.userId] += 1;
+            } else if (predictedEnd === "regulation-en" && actualEndCondition !== "regulation-en") {
+                userPoints[p.userId] -= 2;
+            }
+
+            if (predictedShots === actualTotalShots) {
+                exactShotWinner = p.userId;
+            } else {
+                const diff = Math.abs(predictedShots - actualTotalShots);
+                if (diff < closestShotDiff) {
+                    closestShotDiff = diff;
+                    closestShotWinners = [p.userId];
+                } else if (diff === closestShotDiff) {
+                    closestShotWinners.push(p.userId);
+                }
+            }
+        });
+
+        if (exactShotWinner) {
+            userPoints[exactShotWinner] += 4;
+        } else if (closestShotWinners.length > 0) {
+            userPoints[closestShotWinners[0]] += 2;
+        }
+
+        const batch = db.batch();
+        for (const userId in userPoints) {
+            const userDocRef = db.collection('users').doc(userId);
+            batch.update(userDocRef, { totalScore: admin.firestore.FieldValue.increment(userPoints[userId]) });
+            console.log(`Awarding ${userPoints[userId]} points to user ${userId} in simulation.`);
+        }
+        await batch.commit();
+        
+        console.log("--- SIMULATION COMPLETE ---");
+        res.status(200).send(`Simulation complete for game ${gameId}.`);
+
+    } catch (error) {
+        console.error("Error during SIMULATION process:", error);
+        res.status(500).send("An error occurred during simulation.");
     }
 });
 

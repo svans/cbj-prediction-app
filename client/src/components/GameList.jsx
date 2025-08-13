@@ -12,7 +12,7 @@ const GameList = () => {
     const [openFormId, setOpenFormId] = useState(null);
     const [openPicksId, setOpenPicksId] = useState(null);
     const [myPredictions, setMyPredictions] = useState({});
-    const [rosters, setRosters] = useState({}); // <-- State to hold rosters
+    const [rosters, setRosters] = useState({});
     const userId = auth.currentUser?.uid;
 
     useEffect(() => {
@@ -22,44 +22,17 @@ const GameList = () => {
             const myPredictionsUrl = `https://cbj-prediction-app.onrender.com/api/my-predictions/${userId}`;
 
             try {
-                let realGames = [];
-                let userPredictions = {};
-
                 if (userId) {
                     const [scheduleRes, predictionsRes] = await Promise.all([
                         axios.get(scheduleUrl),
                         axios.get(myPredictionsUrl)
                     ]);
-                    realGames = scheduleRes.data.games;
-                    userPredictions = predictionsRes.data;
+                    setGames(scheduleRes.data.games);
+                    setMyPredictions(predictionsRes.data);
                 } else {
                     const scheduleRes = await axios.get(scheduleUrl);
-                    realGames = scheduleRes.data.games;
+                    setGames(scheduleRes.data.games);
                 }
-
-                // --- ADD THE FAKE GAME FOR TESTING HERE ---
-                const fakeGameDate = new Date();
-                fakeGameDate.setHours(23, 0, 0, 0); // Set time to 11:00 PM today
-
-                const fakeGame = {
-                    id: 99999, // Special ID for simulation
-                    startTimeUTC: fakeGameDate.toISOString(),
-                    awayTeam: {
-                        placeName: { default: "Pittsburgh" },
-                        abbrev: "PIT",
-                        darkLogo: "https://assets.nhle.com/logos/nhl/svg/PIT_dark.svg"
-                    },
-                    homeTeam: {
-                        placeName: { default: "Columbus" },
-                        abbrev: "CBJ",
-                        darkLogo: "https://assets.nhle.com/logos/nhl/svg/CBJ_dark.svg"
-                    },
-                };
-
-                // Combine the fake game with the real games
-                setGames([fakeGame, ...realGames]);
-                setMyPredictions(userPredictions);
-
             } catch (error) {
                 console.error("Error fetching game data!", error);
             } finally {
@@ -70,7 +43,6 @@ const GameList = () => {
         fetchGameData();
     }, [userId]);
 
-    // --- useEffect to fetch rosters for predicted games ---
     useEffect(() => {
         const fetchRostersForPredictions = async () => {
             const newRosters = {};
@@ -106,7 +78,7 @@ const GameList = () => {
 
     const togglePicks = (gameId) => {
         setOpenFormId(null);
-        setOpenPicksId(prevId => (prevId === gameId ? null : prevId));
+        setOpenPicksId(prevId => (prevId === gameId ? null : gameId));
     };
 
     if (loading) return <p className="text-center mt-8">Loading games...</p>;
@@ -119,9 +91,8 @@ const GameList = () => {
                     const existingPrediction = myPredictions[game.id];
                     const isFormOpen = openFormId === game.id;
                     const arePicksOpen = openPicksId === game.id;
-
-                    // --- NEW: Find the scorer's name from the fetched roster ---
                     let scorerName = '';
+
                     if (existingPrediction) {
                         const pred = existingPrediction.prediction || existingPrediction;
                         const roster = rosters[pred.winningTeam];
