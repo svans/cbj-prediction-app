@@ -1,4 +1,3 @@
-/ client/src/components/PredictionForm.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { getFirestore, doc, onSnapshot } from 'firebase/firestore';
@@ -89,7 +88,6 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
         }
     };
 
-    // --- UPDATED LOGIC FOR SHOTS VALIDATION ---
     const isShotTotalTakenByOther = takenShotTotals.includes(Number(totalShots)) && Number(totalShots) !== currentPrediction?.totalShots;
 
     return (
