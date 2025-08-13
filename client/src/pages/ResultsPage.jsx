@@ -27,34 +27,47 @@ const ResultsPage = () => {
     if (error) return <p className="text-center mt-8 text-red-500">{error}</p>;
 
     return (
-        <div className="p-4 md:p-8">
-            <h2 className="text-3xl font-bold mb-6 text-gray-800">Game Results</h2>
-            <div className="space-y-4">
+        <div className="max-w-4xl mx-auto p-4 md:p-8">
+            <h2 className="text-3xl font-bold mb-6 text-center text-ice-white uppercase tracking-wider">Game Results</h2>
+            <div className="space-y-6">
                 {results.length > 0 ? (
-                    results.map(game => (
-                        <div key={game.id} className="bg-white shadow-md rounded-lg p-4">
-                            <p className="text-sm text-gray-500">{new Date(game.startTimeUTC).toLocaleDateString()}</p>
-                            <div className="flex justify-between items-center mt-1">
-                                <div className="flex-1">
-                                    <p className={`text-lg ${game.awayTeam.score > game.homeTeam.score ? 'font-bold' : ''}`}>
-                                        {game.awayTeam.placeName.default}
-                                    </p>
-                                    <p className={`text-lg ${game.homeTeam.score > game.awayTeam.score ? 'font-bold' : ''}`}>
-                                        {game.homeTeam.placeName.default}
-                                    </p>
+                    results.map(game => {
+                        const totalShots = (game.homeTeam.sog || 0) + (game.awayTeam.sog || 0);
+                        const gwgScorer = game.summary?.gameWinningGoal;
+                        const scorerName = gwgScorer ? `${gwgScorer.firstName.default} ${gwgScorer.lastName.default}` : 'N/A';
+
+                        return (
+                            <div key={game.id} className="bg-slate-gray/50 border border-slate-gray rounded-lg p-6">
+                                <div className="flex justify-center items-center gap-4 md:gap-8">
+                                    <img src={game.awayTeam.darkLogo} alt={game.awayTeam.placeName.default} className="h-12 w-12 md:h-16 md:w-16" />
+                                    <div className="text-center">
+                                        <p className="text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleDateString()}</p>
+                                        <div className="flex items-center gap-4 text-2xl font-mono text-ice-white">
+                                            <p className={`p-2 rounded ${game.awayTeam.score > game.homeTeam.score ? 'bg-union-blue' : ''}`}>
+                                                {game.awayTeam.score}
+                                            </p>
+                                            <p>-</p>
+                                            <p className={`p-2 rounded ${game.homeTeam.score > game.awayTeam.score ? 'bg-union-blue' : ''}`}>
+                                                {game.homeTeam.score}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <img src={game.homeTeam.darkLogo} alt={game.homeTeam.placeName.default} className="h-12 w-12 md:h-16 md:w-16" />
                                 </div>
-                                <div className="flex items-center gap-4 text-2xl font-mono">
-                                    <p className={`p-2 rounded ${game.awayTeam.score > game.homeTeam.score ? 'bg-blue-100' : ''}`}>
-                                        {game.awayTeam.score}
-                                    </p>
-                                    <p>-</p>
-                                    <p className={`p-2 rounded ${game.homeTeam.score > game.awayTeam.score ? 'bg-blue-100' : ''}`}>
-                                        {game.homeTeam.score}
-                                    </p>
+                                
+                                <div className="text-center mt-4 border-t border-slate-gray pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <p className="font-bold text-star-silver">Game Winning Goal:</p>
+                                        <p className="text-ice-white">{scorerName}</p>
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-star-silver">Total Shots on Goal:</p>
+                                        <p className="text-ice-white">{totalShots}</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))
+                        )
+                    })
                 ) : (
                     <p>No past games found for this season yet.</p>
                 )}

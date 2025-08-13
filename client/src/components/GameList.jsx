@@ -22,44 +22,17 @@ const GameList = () => {
             const myPredictionsUrl = `https://cbj-prediction-app.onrender.com/api/my-predictions/${userId}`;
 
             try {
-                let realGames = [];
-                let userPredictions = {};
-
                 if (userId) {
                     const [scheduleRes, predictionsRes] = await Promise.all([
                         axios.get(scheduleUrl),
                         axios.get(myPredictionsUrl)
                     ]);
-                    realGames = scheduleRes.data.games;
-                    userPredictions = predictionsRes.data;
+                    setGames(scheduleRes.data.games);
+                    setMyPredictions(predictionsRes.data);
                 } else {
                     const scheduleRes = await axios.get(scheduleUrl);
-                    realGames = scheduleRes.data.games;
+                    setGames(scheduleRes.data.games);
                 }
-
-                // --- ADD THE FAKE GAME FOR TESTING HERE ---
-                const fakeGameDate = new Date();
-                fakeGameDate.setHours(23, 0, 0, 0); // Set time to 11:00 PM today
-
-                const fakeGame = {
-                    id: 99999, // Special ID for simulation
-                    startTimeUTC: fakeGameDate.toISOString(),
-                    awayTeam: {
-                        placeName: { default: "Pittsburgh" },
-                        abbrev: "PIT",
-                        darkLogo: "https://assets.nhle.com/logos/nhl/svg/PIT_dark.svg"
-                    },
-                    homeTeam: {
-                        placeName: { default: "Columbus" },
-                        abbrev: "CBJ",
-                        darkLogo: "https://assets.nhle.com/logos/nhl/svg/CBJ_dark.svg"
-                    },
-                };
-
-                // Combine the fake game with the real games
-                setGames([fakeGame, ...realGames]);
-                setMyPredictions(userPredictions);
-
             } catch (error) {
                 console.error("Error fetching game data!", error);
             } finally {
