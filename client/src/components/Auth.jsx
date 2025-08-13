@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { auth } from '../firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 // Import Firestore methods
-import { getFirestore, doc, setDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 
 const Auth = () => {
     const [email, setEmail] = useState('');
@@ -17,23 +17,39 @@ const Auth = () => {
         e.preventDefault();
         setIsSubmitting(true);
         setError('');
+        const db = getFirestore();
+
         try {
             if (type === 'signup') {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
 
-                // --- NEW: Create a user document in Firestore after sign-up ---
-                const db = getFirestore();
+                // Create a user document in Firestore after sign-up
                 const userDocRef = doc(db, "users", user.uid);
                 await setDoc(userDocRef, {
                     email: user.email,
                     totalScore: 0, // Initialize score to 0
                     userId: user.uid
                 });
-                // --- End of new code ---
 
-            } else {
-                await signInWithEmailAndPassword(auth, email, password);
+            } else { // This is the 'signin' logic
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // --- NEW: Check for and create user doc for existing users on sign-in ---
+                const userDocRef = doc(db, "users", user.uid);
+                const docSnap = await getDoc(userDocRef);
+
+                if (!docSnap.exists()) {
+                    // If the user document doesn't exist, create it.
+                    console.log("User document not found, creating one for existing user.");
+                    await setDoc(userDocRef, {
+                        email: user.email,
+                        totalScore: 0,
+                        userId: user.uid
+                    });
+                }
+                // --- End of new code ---
             }
         } catch (err) {
             setError(err.message.replace('Firebase: ', ''));
