@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import { auth } from '../firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+// Import Firestore methods
+import { getFirestore, doc, setDoc } from "firebase/firestore";
 
 const Auth = () => {
     const [email, setEmail] = useState('');
@@ -17,7 +19,19 @@ const Auth = () => {
         setError('');
         try {
             if (type === 'signup') {
-                await createUserWithEmailAndPassword(auth, email, password);
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // --- NEW: Create a user document in Firestore after sign-up ---
+                const db = getFirestore();
+                const userDocRef = doc(db, "users", user.uid);
+                await setDoc(userDocRef, {
+                    email: user.email,
+                    totalScore: 0, // Initialize score to 0
+                    userId: user.uid
+                });
+                // --- End of new code ---
+
             } else {
                 await signInWithEmailAndPassword(auth, email, password);
             }
