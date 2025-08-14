@@ -29,8 +29,8 @@ const Leaderboard = () => {
     if (error) return <p className="text-center mt-8 text-goal-red">{error}</p>;
 
     return (
-        <div className="bg-slate-gray/50 border border-slate-gray rounded-lg p-6">
-            <h2 className="text-2xl font-bold mb-4 text-ice-white text-center uppercase tracking-wider">Leaderboard</h2>
+        <div className="bg-slate-gray/20 backdrop-blur-md border border-slate-gray/30 rounded-lg p-6">
+            <h2 className="text-2xl font-bold mb-4 text-ice-white text-center uppercase tracking-wider font-quantico">Leaderboard</h2>
             <div className="overflow-x-auto">
                 <table className="min-w-full">
                     <thead className="border-b border-slate-gray">

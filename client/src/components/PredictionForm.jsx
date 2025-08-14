@@ -107,7 +107,7 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
         return (
             <div className="text-center p-8 animate-fade-in-down">
                 <div className="puck-animation"></div>
-                <p className="text-2xl font-bold text-ice-white mt-4">Prediction Saved!</p>
+                <p className="text-2xl font-bold text-ice-white mt-4 font-quantico">Prediction Saved!</p>
             </div>
         );
     }

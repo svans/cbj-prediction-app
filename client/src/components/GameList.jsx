@@ -24,7 +24,7 @@ const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggl
     }
 
     return (
-        <div className="bg-slate-gray/50 border border-slate-gray rounded-lg p-4 md:p-6">
+        <div className="bg-slate-gray/20 backdrop-blur-md border border-slate-gray/30 rounded-lg p-4 md:p-6">
             <div className="flex justify-center items-center gap-4 md:gap-8">
                 <img src={game.awayTeam.darkLogo} alt={game.awayTeam.placeName.default} className="h-12 w-12 md:h-16 md:w-16" />
                 <div className="text-center">
@@ -134,7 +134,7 @@ const GameList = () => {
         <div className="max-w-4xl mx-auto p-4">
             {nextGame && (
                 <section className="mb-12">
-                    <h2 className="text-3xl font-bold text-center mb-6 uppercase text-ice-white tracking-wider">Next Game</h2>
+                    <h2 className="text-3xl font-bold text-center mb-6 uppercase text-ice-white tracking-wider font-quantico">Next Game</h2>
                     <GameCard 
                         game={nextGame} 
                         myPredictions={myPredictions} 
@@ -149,7 +149,7 @@ const GameList = () => {
 
             {upcomingGames.length > 0 && (
                 <section>
-                    <h2 className="text-2xl font-bold text-center mb-6 uppercase text-ice-white tracking-wider">Upcoming Games</h2>
+                    <h2 className="text-2xl font-bold text-center mb-6 uppercase text-ice-white tracking-wider font-quantico">Upcoming Games</h2>
                     <div className="space-y-6">
                         {upcomingGames.map(game => (
                             <GameCard 

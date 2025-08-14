@@ -7,6 +7,10 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        'sans': ['Inter', 'sans-serif'], // Sets Inter as the default body font
+        'quantico': ['Quantico', 'sans-serif'], // Creates a new 'font-quantico' utility
+      },
       colors: {
         'union-blue': '#002654',
         'goal-red': '#CE1126',

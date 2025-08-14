@@ -19,7 +19,7 @@ const LeaderboardSnippet = () => {
 
     return (
         <div className="max-w-4xl mx-auto p-4 text-center">
-            <h3 className="text-2xl font-bold uppercase text-ice-white tracking-wider mb-4">Top Predictors</h3>
+            <h3 className="text-2xl font-bold uppercase text-ice-white tracking-wider mb-4 font-quantico">Top Predictors</h3>
             {/* This div now stacks vertically on mobile and horizontally on medium screens and up */}
             <div className="flex flex-col md:flex-row justify-center gap-4 md:gap-8">
                 {topPlayers.map((player, index) => (

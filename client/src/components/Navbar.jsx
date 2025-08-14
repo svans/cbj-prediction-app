@@ -4,7 +4,7 @@ import { NavLink, Link } from 'react-router-dom';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 
-const Navbar = ({ user }) => {
+const Navbar = ({ user, isAdmin }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     const handleLogout = () => {
@@ -22,11 +22,16 @@ const Navbar = ({ user }) => {
             <div className="max-w-7xl mx-auto px-4">
                 <div className="flex justify-between items-center h-16">
                     <div className="flex items-center">
-                        <Link to="/" className="text-2xl font-bold text-ice-white">CBJ PREDICTOR</Link>
-                        <div className="hidden md:flex ml-10 space-x-4">
+                        <Link to="/" className="text-2xl font-bold text-ice-white font-quantico">CBJ PREDICTOR</Link>
+                        <div className="hidden md:block md:ml-6">
+                        <div className="flex space-x-4">
                             <NavLink to="/" style={({ isActive }) => isActive ? activeLinkStyle : undefined} className="text-star-silver hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors">Home</NavLink>
                             <NavLink to="/leaderboard" style={({ isActive }) => isActive ? activeLinkStyle : undefined} className="text-star-silver hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors">Leaderboard</NavLink>
                             <NavLink to="/results" style={({ isActive }) => isActive ? activeLinkStyle : undefined} className="text-star-silver hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors">Results</NavLink>
+                            {isAdmin && (
+                            <NavLink to="/admin" style={({ isActive }) => isActive ? activeLinkStyle : undefined} className="text-star-silver hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors">Admin</NavLink>
+                    )}
+                        </div>
                         </div>
                     </div>
                     <div className="hidden md:flex items-center gap-4">
