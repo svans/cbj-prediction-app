@@ -1,3 +1,4 @@
+// client/src/components/PredictionForm.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { getFirestore, doc, onSnapshot } from 'firebase/firestore';
@@ -115,8 +116,10 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
     const isShotTotalTakenByOther = takenShotTotals.includes(Number(totalShots)) && Number(totalShots) !== currentPrediction?.totalShots;
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 mt-6 border-t border-slate-gray pt-6 animate-fade-in-down">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="space-y-6 mt-6 border-t border-slate-gray pt-6 animate-fade-in-down">
+            {/* --- Section 1: Team & Scorer --- */}
+            <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <legend className="text-lg font-quantico text-ice-white mb-4 col-span-full">Team & Scorer</legend>
                 <div>
                     <label className={labelStyle}>Winning Team:</label>
                     <select value={winningTeam} onChange={(e) => setWinningTeam(e.target.value)} required className={inputStyle}>
@@ -128,7 +131,7 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
                 <div>
                     <label className={labelStyle}>Game-Winning Goal Scorer:</label>
                     <select value={gwgScorer} onChange={(e) => setGwgScorer(e.target.value)} required className={inputStyle} disabled={!roster.length}>
-                        <option value="" disabled>-- Select a Player --</option>
+                        <option value="" disabled>{loadingRoster ? 'Loading...' : '-- Select a Player --'}</option>
                         {roster.map(player => {
                             const isTaken = takenScorers.includes(String(player.id));
                             const isMyPick = String(player.id) === currentPrediction?.gwgScorer;
@@ -142,14 +145,19 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
                         })}
                     </select>
                 </div>
+            </fieldset>
+
+            {/* --- Section 2: Score & Outcome --- */}
+            <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-slate-gray pt-6">
+                <legend className="text-lg font-quantico text-ice-white mb-4 col-span-full">Score & Outcome</legend>
                 <div>
                     <label className={labelStyle}>Final Score:</label>
-                    <div className="flex items-center gap-2 mt-1">
-                        <input type="number" value={awayScore} onChange={(e) => setAwayScore(e.target.value)} min="0" className={`${inputStyle} w-20`} />
-                        <span className="font-semibold">{game.awayTeam.abbrev}</span>
-                        <span>to</span>
-                        <input type="number" value={homeScore} onChange={(e) => setHomeScore(e.target.value)} min="0" className={`${inputStyle} w-20`} />
-                        <span className="font-semibold">{game.homeTeam.abbrev}</span>
+                    <div className="flex items-center gap-2">
+                        <input type="number" value={awayScore} onChange={(e) => setAwayScore(e.target.value)} min="0" className={`${inputStyle} w-20 text-center`} />
+                        <span className="font-semibold text-star-silver">{game.awayTeam.abbrev}</span>
+                        <span className="text-star-silver">to</span>
+                        <input type="number" value={homeScore} onChange={(e) => setHomeScore(e.target.value)} min="0" className={`${inputStyle} w-20 text-center`} />
+                        <span className="font-semibold text-star-silver">{game.homeTeam.abbrev}</span>
                     </div>
                 </div>
                 <div>
@@ -160,19 +168,36 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
                         <option value="shootout">Shootout</option>
                     </select>
                 </div>
-                <div className="md:col-span-2">
-                    <label className={labelStyle}>Total Shots on Goal (Both Teams):</label>
-                    <input type="number" value={totalShots} onChange={(e) => setTotalShots(e.target.value)} min="0" className={inputStyle} />
-                    {isShotTotalTakenByOther && <p className="text-red-500 text-sm mt-1">This shot total has already been taken.</p>}
-                </div>
-                <div className="md:col-span-2 flex items-center justify-center">
-                    <input id="empty-net" type="checkbox" checked={isEmptyNet} onChange={(e) => setIsEmptyNet(e.target.checked)} className="h-4 w-4 text-goal-red bg-slate-gray border-star-silver rounded focus:ring-goal-red" />
-                    <label htmlFor="empty-net" className="ml-2 block text-sm font-bold text-star-silver">Final Goal is Empty Net?</label>
-                </div>
-            </div>
+            </fieldset>
+
+            {/* --- Section 3: Game Stats --- */}
+            <fieldset className="border-t border-slate-gray pt-6">
+                 <legend className="text-lg font-quantico text-ice-white mb-4">Game Stats</legend>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label className={labelStyle}>Total Shots on Goal (Both Teams):</label>
+                        <input type="number" value={totalShots} onChange={(e) => setTotalShots(e.target.value)} min="0" className={inputStyle} />
+                        {isShotTotalTakenByOther && <p className="text-red-500 text-sm mt-1">This shot total has already been taken.</p>}
+                    </div>
+                    <div className="flex items-center justify-center pt-6 gap-3">
+                        <label htmlFor="empty-net-toggle" className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                id="empty-net-toggle" 
+                                className="sr-only peer"
+                                checked={isEmptyNet}
+                                onChange={(e) => setIsEmptyNet(e.target.checked)}
+                            />
+                            <div className="w-11 h-6 bg-slate-gray rounded-full peer peer-focus:ring-2 peer-focus:ring-goal-red peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-goal-red"></div>
+                        </label>
+                        <span className="text-sm font-bold text-star-silver">Final Goal is Empty Net?</span>
+                    </div>
+                 </div>
+            </fieldset>
+            
             <div className="flex justify-center mt-6">
-                <button type="submit" disabled={isSubmitting || !winningTeam || !gwgScorer || isShotTotalTakenByOther} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-8 rounded disabled:bg-gray-400">
-                    Save Your Predictions
+                <button type="submit" disabled={isSubmitting || !winningTeam || !gwgScorer || isShotTotalTakenByOther} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-8 rounded disabled:bg-gray-400 font-quantico uppercase tracking-wider">
+                    Save Predictions
                 </button>
             </div>
             {message && <p className="mt-4 text-center">{message}</p>}

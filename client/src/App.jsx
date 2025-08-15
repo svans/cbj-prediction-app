@@ -13,7 +13,7 @@ import AuthPage from './pages/AuthPage';
 import ResultsPage from './pages/ResultsPage';
 import AdminPage from './pages/AdminPage';
 import PageLayout from './components/PageLayout';
-import ParticleBackground from './components/ParticleBackground'; // <-- Import the new component
+import DitherBackground from './components/DitherBackground';
 import './App.css';
 
 const ADMIN_UID = "KBEpMpQfsRhP7T4rRSrX2hbZeX83";
@@ -65,7 +65,7 @@ const AppRoutes = () => {
 function App() {
   return (
     <BrowserRouter>
-      <ParticleBackground />
+      <DitherBackground />
       <AppRoutes />
     </BrowserRouter>
   );

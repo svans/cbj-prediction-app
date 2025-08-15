@@ -23,25 +23,36 @@ const CommunityPicks = ({ gameId }) => {
         fetchPicks();
     }, [gameId]);
 
-    if (loading) return <p className="text-center mt-4">Loading picks...</p>;
-    if (error) return <p className="text-center mt-4 text-yellow-600">{error}</p>;
+    if (loading) return <p className="text-center mt-4 text-star-silver">Loading picks...</p>;
+    if (error) return <p className="text-center mt-4 text-goal-red">{error}</p>;
 
     return (
-        <div className="mt-6 border-t border-slate-gray pt-4">
-            <h3 className="text-lg font-bold text-ice-white mb-2 text-center">Community Predictions</h3>
+        <div className="mt-6 border-t border-slate-gray/30 pt-4">
+            <h3 className="text-lg font-quantico text-ice-white mb-4 text-center">Community Predictions</h3>
             {picks.length > 0 ? (
-                <div className="space-y-2 max-h-60 overflow-y-auto p-2">
+                <div className="space-y-2 overflow-y-auto p-2">
                     {picks.map((pick, index) => (
-                        <div key={index} className="bg-union-blue/50 p-3 rounded-md text-sm">
-                            <p className="font-semibold text-star-silver">{pick.email}</p>
-                            <p className="text-ice-white">
-                                Score: {pick.prediction.score}, Shots: {pick.prediction.totalShots}
-                            </p>
+                        <div key={index} className="bg-union-blue/50 p-3 rounded-lg text-sm">
+                            <p className="font-bold text-ice-white text-center">{pick.username || 'Anonymous'}</p>
+                            <div className="grid grid-cols-3 gap-2 mt-2 text-center">
+                                <div>
+                                    <p className="text-xs text-star-silver">Winner</p>
+                                    <p className="font-semibold text-ice-white">{pick.prediction.winningTeam}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-star-silver">Score</p>
+                                    <p className="font-semibold text-ice-white">{pick.prediction.score}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-star-silver">Shots</p>
+                                    <p className="font-semibold text-ice-white">{pick.prediction.totalShots}</p>
+                                </div>
+                            </div>
                         </div>
                     ))}
                 </div>
             ) : (
-                <p className="text-center mt-4 text-gray-400">No predictions have been submitted yet.</p>
+                <p className="text-center mt-4 text-star-silver">No predictions have been submitted yet.</p>
             )}
         </div>
     );
