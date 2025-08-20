@@ -1,5 +1,5 @@
 // client/src/components/GameList.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import PredictionForm from './PredictionForm';
 import PredictionView from './PredictionView';
@@ -7,10 +7,11 @@ import CommunityPicks from './CommunityPicks';
 import { auth } from '../firebase';
 import { useCountdown } from './usePredictionLock';
 import useGameStore from '../store';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
 
 const PredictionLockTimer = ({ deadline }) => {
     const { days, hours, minutes, seconds } = useCountdown(deadline);
-
     if (days > 0) {
         return (
             <div className="text-center mt-2">
@@ -20,7 +21,6 @@ const PredictionLockTimer = ({ deadline }) => {
             </div>
         );
     }
-
     return (
         <div className="text-center mt-2">
             <p className="text-sm text-goal-red font-quantico animate-pulse">
@@ -30,42 +30,7 @@ const PredictionLockTimer = ({ deadline }) => {
     );
 };
 
-// --- NEW: Live Score Component ---
-const LiveScore = ({ game }) => {
-    const [liveScore, setLiveScore] = useState({ 
-        away: game.awayTeam.score || 0, 
-        home: game.homeTeam.score || 0 
-    });
-
-    useEffect(() => {
-        const ws = new WebSocket('wss://cbj-prediction-app.onrender.com');
-
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === 'LIVE_SCORE_UPDATE' && data.gameId === game.id) {
-                setLiveScore({
-                    home: data.homeScore,
-                    away: data.awayScore,
-                });
-            }
-        };
-
-        return () => {
-            ws.close();
-        };
-    }, [game.id]);
-
-    return (
-        <div className="text-center pt-4">
-            <p className="text-lg md:text-xl font-bold text-goal-red animate-pulse">LIVE</p>
-            <p className="text-2xl font-mono text-ice-white">
-                {liveScore.away} - {liveScore.home}
-            </p>
-        </div>
-    );
-};
-
-const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggleForm, togglePicks, isNextGame, isLive }) => {
+const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggleForm, togglePicks, isNextGame }) => {
     const existingPrediction = myPredictions[game.id];
     const isFormOpen = openFormId === game.id;
     const arePicksOpen = openPicksId === game.id;
@@ -86,7 +51,7 @@ const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggl
     }
 
     return (
-        <div className="bg-slate-gray/20 backdrop-blur-md border border-slate-gray/30 rounded-lg p-4 md:p-6">
+        <div className="game-card bg-slate-gray/20 backdrop-blur-md border border-slate-gray/30 rounded-lg p-4 md:p-6">
             <div className="flex justify-center items-start gap-4 md:gap-8">
                 <div className="w-[90px] text-center">
                     <div className="w-[90px] h-[90px] bg-slate-800/50 rounded-full flex items-center justify-center mb-2">
@@ -94,18 +59,11 @@ const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggl
                     </div>
                     <p className="text-sm font-bold text-ice-white truncate">{game.awayTeam.placeName.default}</p>
                 </div>
-
-                {/* Conditionally show live score or game time */}
-                {isLive ? (
-                    <LiveScore game={game} />
-                ) : (
-                    <div className="text-center pt-8">
-                        <p className="text-lg md:text-xl font-bold">AT</p>
-                        <p className="text-xs md:text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleDateString([], { month: 'long', day: 'numeric' })}</p>
-                        <p className="text-xs md:text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                    </div>
-                )}
-
+                <div className="text-center pt-8">
+                    <p className="text-lg md:text-xl font-bold">AT</p>
+                    <p className="text-xs md:text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleDateString([], { month: 'long', day: 'numeric' })}</p>
+                    <p className="text-xs md:text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                </div>
                 <div className="w-[90px] text-center">
                     <div className="w-[90px] h-[90px] bg-slate-800/50 rounded-full flex items-center justify-center mb-2">
                         <img src={game.homeTeam.darkLogo} alt={game.homeTeam.placeName.default} className="h-16 w-16" />
@@ -115,7 +73,8 @@ const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggl
             </div>
 
             {isNextGame && !isLocked && <PredictionLockTimer deadline={deadline} />}
-            {existingPrediction && !isFormOpen && <PredictionView prediction={existingPrediction} scorerName={scorerName} />}
+            {/* Pass the 'game' prop down to PredictionView */}
+            {existingPrediction && !isFormOpen && <PredictionView prediction={existingPrediction} scorerName={scorerName} game={game} />}
             {isFormOpen && <PredictionForm game={game} userId={auth.currentUser?.uid} existingPrediction={existingPrediction} closeForm={() => toggleForm(game.id)} />}
 
             <div className="flex flex-col md:flex-row gap-2 md:gap-4 justify-center mt-6">
@@ -137,30 +96,27 @@ const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggl
 
 const GameList = () => {
     const { games, myPredictions, rosters, loading, fetchRostersForPredictions } = useGameStore();
-    const [liveGameId, setLiveGameId] = useState(null);
     const [openFormId, setOpenFormId] = useState(null);
     const [openPicksId, setOpenPicksId] = useState(null);
+    const container = useRef();
+
+    useGSAP(() => {
+        if (!loading && games.length > 0) {
+            gsap.from(".game-card", {
+                duration: 0.5,
+                opacity: 0,
+                y: 50,
+                stagger: 0.1,
+                ease: "power3.out",
+            });
+        }
+    }, { scope: container, dependencies: [loading, games] });
 
     useEffect(() => {
         if (Object.keys(myPredictions).length > 0) {
             fetchRostersForPredictions();
         }
     }, [myPredictions, fetchRostersForPredictions]);
-    
-    // Check for a live game on load and then every minute
-    useEffect(() => {
-        const checkForLiveGame = async () => {
-            try {
-                const response = await axios.get('https://cbj-prediction-app.onrender.com/api/live-game');
-                setLiveGameId(response.data.liveGameId);
-            } catch (error) {
-                console.error("Could not check for live game", error);
-            }
-        };
-        checkForLiveGame();
-        const interval = setInterval(checkForLiveGame, 60000);
-        return () => clearInterval(interval);
-    }, []);
 
     const toggleForm = (gameId) => {
         setOpenPicksId(null);
@@ -178,7 +134,7 @@ const GameList = () => {
     const upcomingGames = games.length > 1 ? games.slice(1, 5) : [];
 
     return (
-        <div className="max-w-4xl mx-auto p-4">
+        <div className="max-w-4xl mx-auto p-4" ref={container}>
             {nextGame && (
                 <section className="mb-12">
                     <h2 className="text-3xl font-bold text-center mb-6 uppercase text-ice-white tracking-wider font-quantico">Next Game</h2>
@@ -191,7 +147,6 @@ const GameList = () => {
                         toggleForm={toggleForm}
                         togglePicks={togglePicks}
                         isNextGame={true}
-                        isLive={nextGame.id === liveGameId} // Pass isLive prop
                     />
                 </section>
             )}
@@ -211,7 +166,6 @@ const GameList = () => {
                                 toggleForm={toggleForm}
                                 togglePicks={togglePicks}
                                 isNextGame={false}
-                                isLive={game.id === liveGameId} // Pass isLive prop
                             />
                         ))}
                     </div>

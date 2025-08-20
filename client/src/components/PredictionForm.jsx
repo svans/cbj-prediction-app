@@ -1,7 +1,100 @@
 // client/src/components/PredictionForm.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getFirestore, doc, onSnapshot } from 'firebase/firestore';
+import { ChevronDown } from 'lucide-react';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
+
+// --- Reusable Components for a Consistent Form UI ---
+
+const TeamSelector = ({ game, selectedTeam, onSelect }) => (
+    <div className="flex justify-center gap-4">
+        <div 
+            className={`flex flex-col items-center gap-2 cursor-pointer p-2 rounded-lg transition-all duration-300 ${selectedTeam === game.awayTeam.abbrev ? 'bg-goal-red/80 ring-2 ring-ice-white' : 'opacity-60 hover:opacity-100'}`}
+            onClick={() => onSelect(game.awayTeam.abbrev)}
+        >
+            <img src={game.awayTeam.darkLogo} alt={game.awayTeam.placeName.default} className="h-16 w-16" />
+            <p className="font-bold text-ice-white">{game.awayTeam.placeName.default}</p>
+        </div>
+        <div 
+            className={`flex flex-col items-center gap-2 cursor-pointer p-2 rounded-lg transition-all duration-300 ${selectedTeam === game.homeTeam.abbrev ? 'bg-goal-red/80 ring-2 ring-ice-white' : 'opacity-60 hover:opacity-100'}`}
+            onClick={() => onSelect(game.homeTeam.abbrev)}
+        >
+            <img src={game.homeTeam.darkLogo} alt={game.homeTeam.placeName.default} className="h-16 w-16" />
+            <p className="font-bold text-ice-white">{game.homeTeam.placeName.default}</p>
+        </div>
+    </div>
+);
+
+const StyledNumberInput = ({ value, onChange, teamAbbrev }) => (
+    <div className="flex items-center gap-2">
+        <input 
+            type="number" 
+            value={value} 
+            onChange={(e) => onChange(parseInt(e.target.value, 10))} 
+            min="0" 
+            className="w-20 h-12 text-center bg-slate-gray/50 border border-slate-gray/50 rounded-md shadow-sm text-ice-white focus:outline-none focus:ring-2 focus:ring-goal-red [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        />
+        <span className="font-semibold text-star-silver">{teamAbbrev}</span>
+    </div>
+);
+
+const PlayerSelector = ({ roster, selectedPlayer, onSelect, takenScorers, currentPick, disabled, loading }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef(null);
+    const selectedPlayerData = roster.find(p => String(p.id) === String(selectedPlayer));
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setIsOpen(false);
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    return (
+        <div className="relative" ref={dropdownRef}>
+            <button type="button" className="w-full h-12 px-3 py-2 bg-slate-gray/50 border border-slate-gray/50 rounded-md shadow-sm text-ice-white flex justify-between items-center disabled:opacity-50" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled}>
+                {selectedPlayerData ? (
+                    <div className="flex items-center gap-2">
+                        <img src={selectedPlayerData.headshot} alt="" className="h-8 w-8 rounded-full" />
+                        <span>{selectedPlayerData.firstName.default} {selectedPlayerData.lastName.default}</span>
+                    </div>
+                ) : (
+                    <span className="text-star-silver">{loading ? 'Loading...' : '-- Select a Player --'}</span>
+                )}
+                <ChevronDown size={16} className="text-star-silver" />
+            </button>
+            {isOpen && (
+                <ul className="absolute z-10 mt-1 w-full bg-slate-gray border border-star-silver rounded-md shadow-lg max-h-60 overflow-auto">
+                    {roster.map(player => {
+                        const isTaken = takenScorers.includes(String(player.id));
+                        const isMyPick = String(player.id) === String(currentPick);
+                        const isDisabled = isTaken && !isMyPick;
+                        return (
+                            <li key={player.id} className={`flex items-center gap-3 p-2 cursor-pointer hover:bg-union-blue ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={() => { if (!isDisabled) { onSelect(String(player.id)); setIsOpen(false); } }}>
+                                <img src={player.headshot} alt="" className="h-8 w-8 rounded-full" />
+                                <span>{player.firstName.default} {player.lastName.default} (#{player.sweaterNumber})</span>
+                                {isTaken && !isMyPick && <span className="text-xs text-goal-red ml-auto">(Taken)</span>}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </div>
+    );
+};
+
+const StyledSelect = ({ value, onChange, children }) => (
+    <div className="relative">
+        <select value={value} onChange={onChange} className="w-full h-12 px-3 py-2 bg-slate-gray/50 border border-slate-gray/50 rounded-md shadow-sm text-ice-white focus:outline-none focus:ring-2 focus:ring-goal-red appearance-none">
+            {children}
+        </select>
+        <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-star-silver pointer-events-none" />
+    </div>
+);
+
 
 const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
     // State variables
@@ -18,12 +111,37 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
     const [message, setMessage] = useState('');
     const [takenScorers, setTakenScorers] = useState([]);
     const [takenShotTotals, setTakenShotTotals] = useState([]);
-    const [showAnimation, setShowAnimation] = useState(false);
+    const [isFlipped, setIsFlipped] = useState(false);
+    const flipContainerRef = useRef();
+    const checkmarkRef = useRef(); // Ref for the checkmark SVG
 
-    const inputStyle = "mt-1 block w-full px-3 py-2 bg-slate-gray border border-star-silver rounded-md shadow-sm text-ice-white focus:outline-none focus:ring-2 focus:ring-goal-red";
-    const labelStyle = "block text-sm font-bold text-star-silver";
-
+    const labelStyle = "block text-sm font-bold text-star-silver text-center mb-1";
     const currentPrediction = existingPrediction?.prediction || existingPrediction;
+
+    // GSAP animation for the flip and checkmark
+    useGSAP(() => {
+        gsap.set(flipContainerRef.current, { perspective: 1000 });
+        const tl = gsap.timeline();
+
+        if (isFlipped) {
+            tl.to(flipContainerRef.current, {
+                duration: 0.8,
+                rotationY: 180,
+                ease: "back.inOut(1.7)",
+            });
+            // Animate the checkmark drawing from offset 70 to 0
+            tl.to(checkmarkRef.current, {
+                strokeDashoffset: 0,
+                duration: 0.5,
+                ease: "power2.out"
+            }, "-=0.5");
+        } else {
+            gsap.to(flipContainerRef.current, {
+                duration: 0,
+                rotationY: 0,
+            });
+        }
+    }, { dependencies: [isFlipped], scope: flipContainerRef });
 
     // Pre-fill the form when editing an existing prediction
     useEffect(() => {
@@ -91,117 +209,90 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
             await axios.post('https://cbj-prediction-app.onrender.com/api/predictions', {
                 userId, gameId: game.id, prediction, startTimeUTC: game.startTimeUTC
             });
-            setShowAnimation(true);
+            setIsFlipped(true); // Trigger the flip animation
             setTimeout(() => {
-                setShowAnimation(false);
                 closeForm();
-            }, 2500);
+            }, 2500); // Close form after animation
         } catch (error) {
             setMessage(error.response?.data?.message || 'Failed to save prediction.');
-        } finally {
-            setIsSubmitting(false);
+            setIsSubmitting(false); // Re-enable button on error
         }
     };
-
-    // Show animation on successful submission
-    if (showAnimation) {
-        return (
-            <div className="text-center p-8 animate-fade-in-down">
-                <div className="puck-animation"></div>
-                <p className="text-2xl font-bold text-ice-white mt-4 font-quantico">Prediction Saved!</p>
-            </div>
-        );
-    }
 
     const isShotTotalTakenByOther = takenShotTotals.includes(Number(totalShots)) && Number(totalShots) !== currentPrediction?.totalShots;
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6 mt-6 border-t border-slate-gray pt-6 animate-fade-in-down">
-            {/* --- Section 1: Team & Scorer --- */}
-            <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <legend className="text-lg font-quantico text-ice-white mb-4 col-span-full">Team & Scorer</legend>
-                <div>
-                    <label className={labelStyle}>Winning Team:</label>
-                    <select value={winningTeam} onChange={(e) => setWinningTeam(e.target.value)} required className={inputStyle}>
-                        <option value="" disabled>-- Select a Team --</option>
-                        <option value={game.awayTeam.abbrev}>{game.awayTeam.placeName.default}</option>
-                        <option value={game.homeTeam.abbrev}>{game.homeTeam.placeName.default}</option>
-                    </select>
-                </div>
-                <div>
-                    <label className={labelStyle}>Game-Winning Goal Scorer:</label>
-                    <select value={gwgScorer} onChange={(e) => setGwgScorer(e.target.value)} required className={inputStyle} disabled={!roster.length}>
-                        <option value="" disabled>{loadingRoster ? 'Loading...' : '-- Select a Player --'}</option>
-                        {roster.map(player => {
-                            const isTaken = takenScorers.includes(String(player.id));
-                            const isMyPick = String(player.id) === currentPrediction?.gwgScorer;
-                            const isDisabled = isTaken && !isMyPick;
-                            return (
-                                <option key={player.id} value={player.id} disabled={isDisabled}>
-                                    {player.firstName.default} {player.lastName.default} (#{player.sweaterNumber})
-                                    {isTaken && !isMyPick ? " (Taken)" : ""}
-                                </option>
-                            );
-                        })}
-                    </select>
-                </div>
-            </fieldset>
-
-            {/* --- Section 2: Score & Outcome --- */}
-            <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-slate-gray pt-6">
-                <legend className="text-lg font-quantico text-ice-white mb-4 col-span-full">Score & Outcome</legend>
-                <div>
-                    <label className={labelStyle}>Final Score:</label>
-                    <div className="flex items-center gap-2">
-                        <input type="number" value={awayScore} onChange={(e) => setAwayScore(e.target.value)} min="0" className={`${inputStyle} w-20 text-center`} />
-                        <span className="font-semibold text-star-silver">{game.awayTeam.abbrev}</span>
-                        <span className="text-star-silver">to</span>
-                        <input type="number" value={homeScore} onChange={(e) => setHomeScore(e.target.value)} min="0" className={`${inputStyle} w-20 text-center`} />
-                        <span className="font-semibold text-star-silver">{game.homeTeam.abbrev}</span>
-                    </div>
-                </div>
-                <div>
-                    <label className={labelStyle}>Game Ends In:</label>
-                    <select value={endCondition} onChange={(e) => setEndCondition(e.target.value)} className={inputStyle}>
-                        <option value="regulation">Regulation</option>
-                        <option value="overtime">Overtime</option>
-                        <option value="shootout">Shootout</option>
-                    </select>
-                </div>
-            </fieldset>
-
-            {/* --- Section 3: Game Stats --- */}
-            <fieldset className="border-t border-slate-gray pt-6">
-                 <legend className="text-lg font-quantico text-ice-white mb-4">Game Stats</legend>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className={labelStyle}>Total Shots on Goal (Both Teams):</label>
-                        <input type="number" value={totalShots} onChange={(e) => setTotalShots(e.target.value)} min="0" className={inputStyle} />
-                        {isShotTotalTakenByOther && <p className="text-red-500 text-sm mt-1">This shot total has already been taken.</p>}
-                    </div>
-                    <div className="flex items-center justify-center pt-6 gap-3">
-                        <label htmlFor="empty-net-toggle" className="relative inline-flex items-center cursor-pointer">
-                            <input 
-                                type="checkbox" 
-                                id="empty-net-toggle" 
-                                className="sr-only peer"
-                                checked={isEmptyNet}
-                                onChange={(e) => setIsEmptyNet(e.target.checked)}
-                            />
-                            <div className="w-11 h-6 bg-slate-gray rounded-full peer peer-focus:ring-2 peer-focus:ring-goal-red peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-goal-red"></div>
-                        </label>
-                        <span className="text-sm font-bold text-star-silver">Final Goal is Empty Net?</span>
-                    </div>
-                 </div>
-            </fieldset>
-            
-            <div className="flex justify-center mt-6">
-                <button type="submit" disabled={isSubmitting || !winningTeam || !gwgScorer || isShotTotalTakenByOther} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-8 rounded disabled:bg-gray-400 font-quantico uppercase tracking-wider">
-                    Save Predictions
-                </button>
+        <div ref={flipContainerRef} style={{ transformStyle: "preserve-3d" }} className="relative mt-6 border-t border-slate-gray pt-6">
+            {/* Back of the card (Success Message) */}
+            <div style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }} className="absolute inset-0 flex flex-col items-center justify-center">
+                <svg ref={checkmarkRef} className="w-24 h-24 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"
+                    style={{ strokeDasharray: 70, strokeDashoffset: 70 }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-2xl font-bold text-ice-white mt-4 font-quantico">Prediction Saved!</p>
             </div>
-            {message && <p className="mt-4 text-center">{message}</p>}
-        </form>
+
+            {/* Front of the card (The Form) */}
+            <div style={{ backfaceVisibility: "hidden" }}>
+                <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in-down">
+                    <fieldset>
+                        <legend className="text-lg font-quantico text-ice-white mb-4 text-center">Select the Winning Team</legend>
+                        <TeamSelector game={game} selectedTeam={winningTeam} onSelect={setWinningTeam} />
+                    </fieldset>
+
+                    <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-slate-gray pt-6">
+                        <legend className="text-lg font-quantico text-ice-white mb-4 col-span-full text-center">Enter the Details</legend>
+                        <div>
+                            <label className={labelStyle}>Game-Winning Goal Scorer:</label>
+                            <PlayerSelector 
+                                roster={roster}
+                                selectedPlayer={gwgScorer}
+                                onSelect={setGwgScorer}
+                                takenScorers={takenScorers}
+                                currentPick={currentPrediction?.gwgScorer}
+                                disabled={!roster.length}
+                                loading={loadingRoster}
+                            />
+                        </div>
+                        <div>
+                            <label className={labelStyle}>Final Score:</label>
+                            <div className="flex items-center justify-center gap-2 mt-1">
+                                <StyledNumberInput value={awayScore} onChange={setAwayScore} teamAbbrev={game.awayTeam.abbrev} />
+                                <span className="text-star-silver">to</span>
+                                <StyledNumberInput value={homeScore} onChange={setHomeScore} teamAbbrev={game.homeTeam.abbrev} />
+                            </div>
+                        </div>
+                        <div>
+                            <label className={labelStyle}>Game Ends In:</label>
+                            <StyledSelect value={endCondition} onChange={(e) => setEndCondition(e.target.value)}>
+                                <option value="regulation">Regulation</option>
+                                <option value="overtime">Overtime</option>
+                                <option value="shootout">Shootout</option>
+                            </StyledSelect>
+                        </div>
+                        <div>
+                            <label className={labelStyle}>Total Shots on Goal:</label>
+                            <input type="number" value={totalShots} onChange={(e) => setTotalShots(e.target.value)} min="0" className="w-full h-12 px-3 py-2 text-center bg-slate-gray/50 border border-slate-gray/50 rounded-md shadow-sm text-ice-white focus:outline-none focus:ring-2 focus:ring-goal-red [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                            {isShotTotalTakenByOther && <p className="text-red-500 text-sm mt-1 text-center">This shot total has been taken.</p>}
+                        </div>
+                        <div className="md:col-span-2 flex items-center justify-center pt-4 gap-3">
+                            <label htmlFor="empty-net-toggle" className="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="empty-net-toggle" className="sr-only peer" checked={isEmptyNet} onChange={(e) => setIsEmptyNet(e.target.checked)} />
+                                <div className="w-11 h-6 bg-slate-gray rounded-full peer peer-focus:ring-2 peer-focus:ring-goal-red peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-goal-red"></div>
+                            </label>
+                            <span className="text-sm font-bold text-star-silver">Final Goal is Empty Net?</span>
+                        </div>
+                    </fieldset>
+                    
+                    <div className="flex justify-center mt-6">
+                        <button type="submit" disabled={isSubmitting || !winningTeam || !gwgScorer || isShotTotalTakenByOther} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-8 rounded disabled:bg-gray-400 font-quantico uppercase tracking-wider">
+                            Save Predictions
+                        </button>
+                    </div>
+                    {message && <p className="mt-4 text-center">{message}</p>}
+                </form>
+            </div>
+        </div>
     );
 };
 
