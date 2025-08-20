@@ -1,11 +1,12 @@
 // client/src/components/GameList.jsx
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import PredictionForm from './PredictionForm';
 import PredictionView from './PredictionView';
 import CommunityPicks from './CommunityPicks';
 import { auth } from '../firebase';
 import { useCountdown } from './usePredictionLock';
-import useGameStore from '../store'; // <-- Import the Zustand store
+import useGameStore from '../store';
 
 const PredictionLockTimer = ({ deadline }) => {
     const { days, hours, minutes, seconds } = useCountdown(deadline);
@@ -29,7 +30,42 @@ const PredictionLockTimer = ({ deadline }) => {
     );
 };
 
-const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggleForm, togglePicks, isNextGame }) => {
+// --- NEW: Live Score Component ---
+const LiveScore = ({ game }) => {
+    const [liveScore, setLiveScore] = useState({ 
+        away: game.awayTeam.score || 0, 
+        home: game.homeTeam.score || 0 
+    });
+
+    useEffect(() => {
+        const ws = new WebSocket('wss://cbj-prediction-app.onrender.com');
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'LIVE_SCORE_UPDATE' && data.gameId === game.id) {
+                setLiveScore({
+                    home: data.homeScore,
+                    away: data.awayScore,
+                });
+            }
+        };
+
+        return () => {
+            ws.close();
+        };
+    }, [game.id]);
+
+    return (
+        <div className="text-center pt-4">
+            <p className="text-lg md:text-xl font-bold text-goal-red animate-pulse">LIVE</p>
+            <p className="text-2xl font-mono text-ice-white">
+                {liveScore.away} - {liveScore.home}
+            </p>
+        </div>
+    );
+};
+
+const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggleForm, togglePicks, isNextGame, isLive }) => {
     const existingPrediction = myPredictions[game.id];
     const isFormOpen = openFormId === game.id;
     const arePicksOpen = openPicksId === game.id;
@@ -58,11 +94,18 @@ const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggl
                     </div>
                     <p className="text-sm font-bold text-ice-white truncate">{game.awayTeam.placeName.default}</p>
                 </div>
-                <div className="text-center pt-8">
-                    <p className="text-lg md:text-xl font-bold">AT</p>
-                    <p className="text-xs md:text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleDateString([], { month: 'long', day: 'numeric' })}</p>
-                    <p className="text-xs md:text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                </div>
+
+                {/* Conditionally show live score or game time */}
+                {isLive ? (
+                    <LiveScore game={game} />
+                ) : (
+                    <div className="text-center pt-8">
+                        <p className="text-lg md:text-xl font-bold">AT</p>
+                        <p className="text-xs md:text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleDateString([], { month: 'long', day: 'numeric' })}</p>
+                        <p className="text-xs md:text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                )}
+
                 <div className="w-[90px] text-center">
                     <div className="w-[90px] h-[90px] bg-slate-800/50 rounded-full flex items-center justify-center mb-2">
                         <img src={game.homeTeam.darkLogo} alt={game.homeTeam.placeName.default} className="h-16 w-16" />
@@ -93,18 +136,31 @@ const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggl
 };
 
 const GameList = () => {
-    // --- Get state and actions directly from the Zustand store ---
     const { games, myPredictions, rosters, loading, fetchRostersForPredictions } = useGameStore();
-    
+    const [liveGameId, setLiveGameId] = useState(null);
     const [openFormId, setOpenFormId] = useState(null);
     const [openPicksId, setOpenPicksId] = useState(null);
 
-    // This useEffect now only triggers the roster fetch when predictions change
     useEffect(() => {
         if (Object.keys(myPredictions).length > 0) {
             fetchRostersForPredictions();
         }
     }, [myPredictions, fetchRostersForPredictions]);
+    
+    // Check for a live game on load and then every minute
+    useEffect(() => {
+        const checkForLiveGame = async () => {
+            try {
+                const response = await axios.get('https://cbj-prediction-app.onrender.com/api/live-game');
+                setLiveGameId(response.data.liveGameId);
+            } catch (error) {
+                console.error("Could not check for live game", error);
+            }
+        };
+        checkForLiveGame();
+        const interval = setInterval(checkForLiveGame, 60000);
+        return () => clearInterval(interval);
+    }, []);
 
     const toggleForm = (gameId) => {
         setOpenPicksId(null);
@@ -135,6 +191,7 @@ const GameList = () => {
                         toggleForm={toggleForm}
                         togglePicks={togglePicks}
                         isNextGame={true}
+                        isLive={nextGame.id === liveGameId} // Pass isLive prop
                     />
                 </section>
             )}
@@ -154,6 +211,7 @@ const GameList = () => {
                                 toggleForm={toggleForm}
                                 togglePicks={togglePicks}
                                 isNextGame={false}
+                                isLive={game.id === liveGameId} // Pass isLive prop
                             />
                         ))}
                     </div>

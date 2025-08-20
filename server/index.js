@@ -18,7 +18,7 @@ const db = admin.firestore();
 
 // --- Express App Setup ---
 const app = express();
-const allowedOrigins = ['http://localhost:5173', 'https://cbj-prediction-app-5c396.web.app'];
+const allowedOrigins = ['http://localhost:5173', 'https://cbj-prediction-app-5c396.web.app', 'https://cbjpredictions.app'];
 const corsOptions = {
   origin: (origin, callback) => {
     if (allowedOrigins.includes(origin) || !origin) {
@@ -41,7 +41,7 @@ app.get('/', (req, res) => {
     res.status(200).send('Server is up and running!');
 });
 
-// Get Upcoming Games (with updated logic)
+// Get Upcoming Games
 app.get('/api/schedule', async (req, res) => {
     try {
         const url = 'https://api-web.nhle.com/v1/club-schedule-season/CBJ/now';
@@ -328,12 +328,10 @@ app.post('/api/score-game/:gameId', async (req, res) => {
     }
 });
 
-// User profile
+// Get User Profile
 app.get('/api/profile/:username', async (req, res) => {
   try {
     const { username } = req.params;
-
-    // 1. Find the user by their username
     const usersRef = db.collection('users');
     const userSnapshot = await usersRef.where('username', '==', username).limit(1).get();
 
@@ -343,35 +341,36 @@ app.get('/api/profile/:username', async (req, res) => {
     const user = userSnapshot.docs[0].data();
     const userId = userSnapshot.docs[0].id;
 
-    // 2. Fetch all of that user's predictions
     const predictionsSnapshot = await db.collection('predictions').where('userId', '==', userId).get();
     const predictions = predictionsSnapshot.docs.map(doc => doc.data());
 
-    // 3. For each prediction, fetch the final game data
     const detailedPredictions = await Promise.all(
       predictions.map(async (p) => {
         try {
-          const gameResultUrl = `https://api-web.nhle.com/v1/gamecenter/${p.gameId}/landing`;
-          const gameResponse = await axios.get(gameResultUrl);
-          return {
-            prediction: p,
-            game: gameResponse.data,
-          };
+          if (new Date(p.startTimeUTC) < new Date()) {
+            const gameResultUrl = `https://api-web.nhle.com/v1/gamecenter/${p.gameId}/landing`;
+            const gameResponse = await axios.get(gameResultUrl);
+            return {
+              prediction: p,
+              game: gameResponse.data,
+            };
+          }
+          return { prediction: p, game: null };
         } catch (error) {
           return { prediction: p, game: null };
         }
       })
     );
-
-    // 4. Sort predictions by date and send the complete profile data
-    detailedPredictions.sort((a, b) => new Date(b.prediction.timestamp) - new Date(a.prediction.timestamp));
+    
+    const pastPredictions = detailedPredictions.filter(p => p.game !== null);
+    pastPredictions.sort((a, b) => new Date(b.game.startTimeUTC) - new Date(a.game.startTimeUTC));
     
     res.json({
       user: {
         username: user.username,
         totalScore: user.totalScore,
       },
-      predictions: detailedPredictions,
+      predictions: pastPredictions,
     });
 
   } catch (error) {
@@ -379,7 +378,6 @@ app.get('/api/profile/:username', async (req, res) => {
     res.status(500).send("Failed to fetch profile data.");
   }
 });
-
 
 // --- Start Server ---
 app.listen(PORT, '0.0.0.0', () => {

@@ -75,7 +75,7 @@ const DitherShaderMaterial = {
         vec2 cellCoord = cellId * (8.0 * pixelSize);
         vec2 uv = (cellCoord / uResolution) * vec2(aspectRatio, 1.0);
         
-        float feed = fbm(uv, uTime * 0.03);
+        float feed = fbm(uv, uTime * 0.08);
         
         float brightness = -0.65;
         float contrast = 0.5;
@@ -85,8 +85,8 @@ const DitherShaderMaterial = {
         
         float bw = step(0.5, feed + bayerValue);
         
-        vec3 unionBlue = vec3(0.0, 0.149, 0.329);
-        vec3 starSilver = vec3(0.635, 0.667, 0.678);
+        vec3 unionBlue = vec3(0.0, 0.0, 0.0);
+        vec3 starSilver = vec3(0.0, 0.149, 0.329);
         
         vec3 finalColor = mix(unionBlue, starSilver, bw);
         
