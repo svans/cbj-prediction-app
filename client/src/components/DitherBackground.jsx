@@ -26,22 +26,14 @@ const DitherShaderMaterial = {
         a = floor(a);
         return fract(a.x / 2.0 + a.y * a.y * 0.75);
     }
+    float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
+    float bayer8(vec2 a) { return bayer4(0.5 * a) * 0.25 + bayer2(a); }
 
-    float bayer4(vec2 a) {
-        return bayer2(0.5 * a) * 0.25 + bayer2(a);
-    }
-
-    float bayer8(vec2 a) {
-        return bayer4(0.5 * a) * 0.25 + bayer2(a);
-    }
-
-    // 1D hash and 3D value-noise helpers
+    // 3D value-noise function
     float hash11(float n) { return fract(sin(n)*43758.5453); }
-
     float vnoise(vec3 p) {
         vec3 ip = floor(p);
         vec3 fp = fract(p);
-
         float n000 = hash11(dot(ip + vec3(0.0,0.0,0.0), vec3(1.0,57.0,113.0)));
         float n100 = hash11(dot(ip + vec3(1.0,0.0,0.0), vec3(1.0,57.0,113.0)));
         float n010 = hash11(dot(ip + vec3(0.0,1.0,0.0), vec3(1.0,57.0,113.0)));
@@ -50,31 +42,26 @@ const DitherShaderMaterial = {
         float n101 = hash11(dot(ip + vec3(1.0,0.0,1.0), vec3(1.0,57.0,113.0)));
         float n011 = hash11(dot(ip + vec3(0.0,1.0,1.0), vec3(1.0,57.0,113.0)));
         float n111 = hash11(dot(ip + vec3(1.0,1.0,1.0), vec3(1.0,57.0,113.0)));
-
         vec3 w = fp*fp*fp*(fp*(fp*6.0-15.0)+10.0);
-
         float x00 = mix(n000, n100, w.x);
         float x10 = mix(n010, n110, w.x);
         float x01 = mix(n001, n101, w.x);
         float x11 = mix(n011, n111, w.x);
-
         float y0 = mix(x00, x10, w.y);
         float y1 = mix(x01, x11, w.y);
-
-        return mix(y0, y1, w.z);
+        return mix(y0, y1, w.z) * 2.0 - 1.0;
     }
 
     // Fractional Brownian Motion using 3D noise
     float fbm(vec2 uv, float t) {
-        vec3 p = vec3(uv * 1.0, t); // FBM_SCALE
+        vec3 p = vec3(uv * 4.0, t);
         float amp = 1.0;
         float freq = 1.0;
-        float sum = 0.0;
-
-        for (int i = 0; i < 5; ++i) { // FBM_OCTAVES
+        float sum = 1.0;
+        for (int i = 0; i < 5; ++i) {
             sum += amp * vnoise(p * freq);
-            freq *= 1.5; // FBM_LACUNARITY
-            amp *= 1.0;   // FBM_GAIN
+            freq *= 1.25;
+            amp *= 1.0;
         }
         return sum * 0.5 + 0.5;
     }
@@ -82,22 +69,28 @@ const DitherShaderMaterial = {
     void main() {
         float pixelSize = 4.0;
         float aspectRatio = uResolution.x / uResolution.y;
-        vec2 uv = vUv * vec2(aspectRatio, 1.0);
         
-        float noise = fbm(uv, uTime * 0.04);
+        // --- UPDATED LOGIC from the tutorial ---
+        vec2 cellId = floor(gl_FragCoord.xy / (8.0 * pixelSize));
+        vec2 cellCoord = cellId * (8.0 * pixelSize);
+        vec2 uv = (cellCoord / uResolution) * vec2(aspectRatio, 1.0);
         
-        float brightness = -0.9;
-        float contrast = .5;
-        noise = noise * contrast + brightness;
+        float feed = fbm(uv, uTime * 0.03);
+        
+        float brightness = -0.65;
+        float contrast = 0.5;
+        feed = feed * contrast + brightness;
 
         float bayerValue = bayer8(gl_FragCoord.xy / pixelSize) - 0.5;
         
-        float bw = step(0.5, noise + bayerValue);
+        float bw = step(0.5, feed + bayerValue);
         
-        vec3 ditherColor = vec3(0.635, 0.667, 0.678); // Star Silver
+        vec3 unionBlue = vec3(0.0, 0.149, 0.329);
+        vec3 starSilver = vec3(0.635, 0.667, 0.678);
         
-        // Final color is the dither color, but only where bw is 1.0
-        gl_FragColor = vec4(ditherColor * bw, bw * 0.9); // Use alpha for subtlety
+        vec3 finalColor = mix(unionBlue, starSilver, bw);
+        
+        gl_FragColor = vec4(finalColor, 1.0);
     }
   `,
 };
@@ -113,7 +106,7 @@ const Scene = () => {
 
   return (
     <Plane args={[2, 2]}>
-      <shaderMaterial ref={material} args={[DitherShaderMaterial]} transparent={true} />
+      <shaderMaterial ref={material} args={[DitherShaderMaterial]} />
     </Plane>
   );
 };

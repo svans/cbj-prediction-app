@@ -5,12 +5,40 @@ import PredictionForm from './PredictionForm';
 import PredictionView from './PredictionView';
 import CommunityPicks from './CommunityPicks';
 import { auth } from '../firebase';
+import { useCountdown } from './usePredictionLock'; // Import from the new file
 
-const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggleForm, togglePicks }) => {
+const PredictionLockTimer = ({ deadline }) => {
+    // The hook now returns days as well
+    const { days, hours, minutes, seconds } = useCountdown(deadline);
+
+    // Conditionally render the output
+    if (days > 0) {
+        return (
+            <div className="text-center mt-2">
+                <p className="text-sm text-star-silver font-quantico">
+                    Predictions Lock In: {days}d {hours}h {minutes}m
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="text-center mt-2">
+            <p className="text-sm text-goal-red font-quantico animate-pulse">
+                Predictions Lock In: {String(hours).padStart(2, '0')}:{String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+            </p>
+        </div>
+    );
+};
+
+const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggleForm, togglePicks, isNextGame }) => {
     const existingPrediction = myPredictions[game.id];
     const isFormOpen = openFormId === game.id;
     const arePicksOpen = openPicksId === game.id;
     let scorerName = '';
+
+    const deadline = new Date(new Date(game.startTimeUTC).getTime() + 7 * 60 * 1000);
+    const isLocked = new Date() > deadline;
 
     if (existingPrediction) {
         const pred = existingPrediction.prediction || existingPrediction;
@@ -25,15 +53,30 @@ const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggl
 
     return (
         <div className="bg-slate-gray/20 backdrop-blur-md border border-slate-gray/30 rounded-lg p-4 md:p-6">
-            <div className="flex justify-center items-center gap-4 md:gap-8">
-                <img src={game.awayTeam.darkLogo} alt={game.awayTeam.placeName.default} className="h-12 w-12 md:h-16 md:w-16" />
-                <div className="text-center">
+            <div className="flex justify-center items-start gap-4 md:gap-8">
+                {/* Away Team Logo with name */}
+                <div className="w-[90px] text-center">
+                    <div className="w-[90px] h-[90px] bg-slate-800/50 rounded-full flex items-center justify-center mb-2">
+                        <img src={game.awayTeam.darkLogo} alt={game.awayTeam.placeName.default} className="h-16 w-16" />
+                    </div>
+                    <p className="text-sm font-bold text-ice-white truncate">{game.awayTeam.placeName.default}</p>
+                </div>
+                <div className="text-center pt-8">
                     <p className="text-lg md:text-xl font-bold">AT</p>
                     <p className="text-xs md:text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleDateString([], { month: 'long', day: 'numeric' })}</p>
                     <p className="text-xs md:text-sm text-star-silver">{new Date(game.startTimeUTC).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
-                <img src={game.homeTeam.darkLogo} alt={game.homeTeam.placeName.default} className="h-12 w-12 md:h-16 md:w-16" />
+                {/* Home Team Logo with name */}
+                <div className="w-[90px] text-center">
+                    <div className="w-[90px] h-[90px] bg-slate-800/50 rounded-full flex items-center justify-center mb-2">
+                        <img src={game.homeTeam.darkLogo} alt={game.homeTeam.placeName.default} className="h-16 w-16" />
+                    </div>
+                    <p className="text-sm font-bold text-ice-white truncate">{game.homeTeam.placeName.default}</p>
+                </div>
             </div>
+
+            {/* Conditionally render the countdown timer */}
+            {isNextGame && !isLocked && <PredictionLockTimer deadline={deadline} />}
 
             {existingPrediction && !isFormOpen && <PredictionView prediction={existingPrediction} scorerName={scorerName} />}
             {isFormOpen && <PredictionForm game={game} userId={auth.currentUser?.uid} existingPrediction={existingPrediction} closeForm={() => toggleForm(game.id)} />}
@@ -42,9 +85,9 @@ const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggl
                 {isFormOpen ? (
                     <button onClick={() => toggleForm(game.id)} className="bg-goal-red hover:bg-red-700 text-white font-bold py-2 px-6 rounded transition-colors">Cancel</button>
                 ) : existingPrediction ? (
-                    <button onClick={() => toggleForm(game.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded transition-colors">Edit Your Predictions</button>
+                    <button onClick={() => toggleForm(game.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded transition-colors" disabled={isLocked}>Edit Your Predictions</button>
                 ) : (
-                    <button onClick={() => toggleForm(game.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded transition-colors">Make Your Predictions</button>
+                    <button onClick={() => toggleForm(game.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded transition-colors" disabled={isLocked}>Make Your Predictions</button>
                 )}
                 <button onClick={() => togglePicks(game.id)} className="bg-slate-gray hover:bg-gray-600 text-white font-bold py-2 px-6 rounded transition-colors">
                     {arePicksOpen ? 'Hide All Predictions' : 'See All Predictions'}
@@ -143,6 +186,7 @@ const GameList = () => {
                         openPicksId={openPicksId}
                         toggleForm={toggleForm}
                         togglePicks={togglePicks}
+                        isNextGame={true}
                     />
                 </section>
             )}
@@ -161,6 +205,7 @@ const GameList = () => {
                                 openPicksId={openPicksId}
                                 toggleForm={toggleForm}
                                 togglePicks={togglePicks}
+                                isNextGame={false}
                             />
                         ))}
                     </div>
