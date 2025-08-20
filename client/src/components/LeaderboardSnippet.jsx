@@ -1,7 +1,9 @@
 // client/src/components/LeaderboardSnippet.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Crown } from 'lucide-react'; // Import the Crown icon
+import { Crown } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import CountUp from 'react-countup';
 
 const LeaderboardSnippet = () => {
     const [topPlayers, setTopPlayers] = useState([]);
@@ -10,7 +12,7 @@ const LeaderboardSnippet = () => {
         const fetchLeaderboard = async () => {
             try {
                 const response = await axios.get('https://cbj-prediction-app.onrender.com/api/leaderboard');
-                setTopPlayers(response.data.slice(0, 3)); // Get top 3
+                setTopPlayers(response.data.slice(0, 3));
             } catch (error) {
                 console.error("Failed to fetch leaderboard snippet", error);
             }
@@ -27,13 +29,16 @@ const LeaderboardSnippet = () => {
                         <div>
                             <p className="text-lg font-bold text-star-silver">#{index + 1}</p>
                             <div className="flex items-center justify-center gap-2">
-                                {/* Conditionally render the crown icon for the #1 player */}
                                 {index === 0 && <Crown size={20} className="text-yellow-400" />}
-                                <p className="text-xl font-bold text-ice-white truncate">{player.username || player.email}</p>
+                                <Link to={`/profile/${player.username}`}>
+                                    <p className="text-xl font-bold text-ice-white truncate hover:underline">{player.username || player.email}</p>
+                                </Link>
                             </div>
                         </div>
                         <div className="mt-2">
-                            <p className="inline-block bg-goal-red text-ice-white font-bold text-md px-3 py-1 rounded-md">{player.totalScore} pts</p>
+                            <p className="inline-block bg-goal-red text-ice-white font-bold text-md px-3 py-1 rounded-md">
+                                <CountUp end={player.totalScore} duration={1.5} /> pts
+                            </p>
                         </div>
                     </div>
                 ))}

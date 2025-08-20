@@ -1,7 +1,9 @@
 // client/src/components/Leaderboard.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { auth } from '../firebase'; // Import auth to get the current user
+import { auth } from '../firebase';
+import { Link } from 'react-router-dom';
+import CountUp from 'react-countup';
 
 const Leaderboard = () => {
     const [leaderboardData, setLeaderboardData] = useState([]);
@@ -12,7 +14,6 @@ const Leaderboard = () => {
     useEffect(() => {
         const fetchLeaderboard = async () => {
             try {
-                // Corrected the axios call to use the single, correct URL
                 const response = await axios.get('https://cbj-prediction-app.onrender.com/api/leaderboard');
                 setLeaderboardData(response.data);
                 setError('');
@@ -41,25 +42,22 @@ const Leaderboard = () => {
                         </tr>
                     </thead>
                     <tbody className="text-ice-white">
-                        {leaderboardData.length > 0 ? (
-                            leaderboardData.map((user, index) => {
-                                const isCurrentUser = user.userId === currentUser?.uid;
-                                return (
-                                    <tr key={user.userId || index} className={`border-b border-slate-gray/50 ${isCurrentUser ? 'bg-blue-900/50' : ''}`}>
-                                        <td className="text-left py-3 px-4">{index + 1}</td>
-                                        {/* Use username with a fallback to email */}
-                                        <td className="text-left py-3 px-4">{user.username || user.email}</td>
-                                        <td className="text-right py-3 px-4 font-bold">{user.totalScore}</td>
-                                    </tr>
-                                );
-                            })
-                        ) : (
-                            <tr>
-                                <td colSpan="3" className="text-center py-6 text-star-silver">
-                                    No scores yet. Be the first to make a prediction!
-                                </td>
-                            </tr>
-                        )}
+                        {leaderboardData.map((user, index) => {
+                            const isCurrentUser = user.userId === currentUser?.uid;
+                            return (
+                                <tr key={user.userId || index} className={`border-b border-slate-gray/50 ${isCurrentUser ? 'bg-blue-900/50' : ''}`}>
+                                    <td className="text-left py-3 px-4">{index + 1}</td>
+                                    <td className="text-left py-3 px-4">
+                                        <Link to={`/profile/${user.username}`}>
+                                            <span className="hover:underline">{user.username || user.email}</span>
+                                        </Link>
+                                    </td>
+                                    <td className="text-right py-3 px-4 font-bold">
+                                        <CountUp end={user.totalScore} duration={1} />
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>

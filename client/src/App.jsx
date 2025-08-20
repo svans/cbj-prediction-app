@@ -15,6 +15,8 @@ import AdminPage from './pages/AdminPage';
 import PageLayout from './components/PageLayout';
 import DitherBackground from './components/DitherBackground';
 import './App.css';
+import ProfilePage from './pages/ProfilePage';
+
 
 const ADMIN_UID = "KBEpMpQfsRhP7T4rRSrX2hbZeX83";
 
@@ -55,6 +57,7 @@ const AppRoutes = () => {
               element={isAdmin ? <PageLayout><AdminPage /></PageLayout> : <Navigate to="/" />}
             />
             <Route path="*" element={<Navigate to="/" />} />
+            <Route path="/profile/:username" element={<PageLayout><ProfilePage /></PageLayout>} />
           </Routes>
         </AnimatePresence>
       </main>

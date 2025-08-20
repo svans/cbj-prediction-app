@@ -328,7 +328,60 @@ app.post('/api/score-game/:gameId', async (req, res) => {
     }
 });
 
+// User profile
+app.get('/api/profile/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    // 1. Find the user by their username
+    const usersRef = db.collection('users');
+    const userSnapshot = await usersRef.where('username', '==', username).limit(1).get();
+
+    if (userSnapshot.empty) {
+      return res.status(404).send({ message: "User not found." });
+    }
+    const user = userSnapshot.docs[0].data();
+    const userId = userSnapshot.docs[0].id;
+
+    // 2. Fetch all of that user's predictions
+    const predictionsSnapshot = await db.collection('predictions').where('userId', '==', userId).get();
+    const predictions = predictionsSnapshot.docs.map(doc => doc.data());
+
+    // 3. For each prediction, fetch the final game data
+    const detailedPredictions = await Promise.all(
+      predictions.map(async (p) => {
+        try {
+          const gameResultUrl = `https://api-web.nhle.com/v1/gamecenter/${p.gameId}/landing`;
+          const gameResponse = await axios.get(gameResultUrl);
+          return {
+            prediction: p,
+            game: gameResponse.data,
+          };
+        } catch (error) {
+          return { prediction: p, game: null };
+        }
+      })
+    );
+
+    // 4. Sort predictions by date and send the complete profile data
+    detailedPredictions.sort((a, b) => new Date(b.prediction.timestamp) - new Date(a.prediction.timestamp));
+    
+    res.json({
+      user: {
+        username: user.username,
+        totalScore: user.totalScore,
+      },
+      predictions: detailedPredictions,
+    });
+
+  } catch (error) {
+    console.error("Error fetching profile data:", error);
+    res.status(500).send("Failed to fetch profile data.");
+  }
+});
+
+
 // --- Start Server ---
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
 });
