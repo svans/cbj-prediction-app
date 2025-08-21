@@ -50,6 +50,14 @@ const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggl
         }
     }
 
+    const getMyPredictionButtonText = () => {
+        if (isFormOpen) return 'Cancel';
+        if (existingPrediction) return 'Edit Prediction';
+        return 'Make Prediction';
+    };
+    
+    const myPredictionButtonColor = isFormOpen ? 'bg-goal-red' : 'bg-blue-600';
+
     return (
         <div className="game-card bg-slate-gray/20 backdrop-blur-md border border-slate-gray/30 rounded-lg p-4 md:p-6">
             <div className="flex justify-center items-start gap-4 md:gap-8">
@@ -73,22 +81,30 @@ const GameCard = ({ game, myPredictions, rosters, openFormId, openPicksId, toggl
             </div>
 
             {isNextGame && !isLocked && <PredictionLockTimer deadline={deadline} />}
-            {/* Pass the 'game' prop down to PredictionView */}
             {existingPrediction && !isFormOpen && <PredictionView prediction={existingPrediction} scorerName={scorerName} game={game} />}
-            {isFormOpen && <PredictionForm game={game} userId={auth.currentUser?.uid} existingPrediction={existingPrediction} closeForm={() => toggleForm(game.id)} />}
-
+            
             <div className="flex flex-col md:flex-row gap-2 md:gap-4 justify-center mt-6">
-                {isFormOpen ? (
-                    <button onClick={() => toggleForm(game.id)} className="bg-goal-red hover:bg-red-700 text-white font-bold py-2 px-6 rounded transition-colors">Cancel</button>
-                ) : existingPrediction ? (
-                    <button onClick={() => toggleForm(game.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded transition-colors" disabled={isLocked}>Edit Your Predictions</button>
+                {isLocked ? (
+                    <div className="bg-slate-gray/50 text-star-silver font-bold py-2 px-6 rounded-lg text-center">Locked</div>
                 ) : (
-                    <button onClick={() => toggleForm(game.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded transition-colors" disabled={isLocked}>Make Your Predictions</button>
+                    <>
+                        <button 
+                            onClick={() => toggleForm(game.id)}
+                            className={`w-full md:w-auto px-4 py-2 text-sm font-bold rounded-lg transition-colors ${isFormOpen ? myPredictionButtonColor + ' text-white' : 'bg-transparent border border-star-silver text-star-silver hover:bg-slate-gray/50'}`}
+                        >
+                            {getMyPredictionButtonText()}
+                        </button>
+                        <button 
+                            onClick={() => togglePicks(game.id)}
+                            className={`w-full md:w-auto px-4 py-2 text-sm font-bold rounded-lg transition-colors ${arePicksOpen ? 'bg-blue-600 text-white' : 'bg-transparent border border-star-silver text-star-silver hover:bg-slate-gray/50'}`}
+                        >
+                            Community Picks
+                        </button>
+                    </>
                 )}
-                <button onClick={() => togglePicks(game.id)} className="bg-slate-gray hover:bg-gray-600 text-white font-bold py-2 px-6 rounded transition-colors">
-                    {arePicksOpen ? 'Hide All Predictions' : 'See All Predictions'}
-                </button>
             </div>
+
+            {isFormOpen && <PredictionForm game={game} userId={auth.currentUser?.uid} existingPrediction={existingPrediction} closeForm={() => toggleForm(game.id)} />}
             {arePicksOpen && <CommunityPicks gameId={game.id} />}
         </div>
     );

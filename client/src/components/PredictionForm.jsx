@@ -95,6 +95,13 @@ const StyledSelect = ({ value, onChange, children }) => (
     </div>
 );
 
+const CelebrationGif = ({ winningTeam }) => {
+    const cbjWinGif = 'https://cdn.vox-cdn.com/uploads/chorus_asset/file/2351334/chippendale.0.gif';
+    const cbjLoseGif = 'https://i.pinimg.com/originals/34/69/56/346956d4f4c66cddab696870b0ad4e9c.gif';
+    const gifSrc = winningTeam === 'CBJ' ? cbjWinGif : cbjLoseGif;
+    return <img src={gifSrc} alt="Celebration Gif" className="h-48 rounded-lg shadow-lg mb-4" />;
+};
+
 
 const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
     // State variables
@@ -113,34 +120,18 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
     const [takenShotTotals, setTakenShotTotals] = useState([]);
     const [isFlipped, setIsFlipped] = useState(false);
     const flipContainerRef = useRef();
-    const checkmarkRef = useRef(); // Ref for the checkmark SVG
 
     const labelStyle = "block text-sm font-bold text-star-silver text-center mb-1";
     const currentPrediction = existingPrediction?.prediction || existingPrediction;
 
-    // GSAP animation for the flip and checkmark
+    // GSAP animation for the flip
     useGSAP(() => {
         gsap.set(flipContainerRef.current, { perspective: 1000 });
-        const tl = gsap.timeline();
-
-        if (isFlipped) {
-            tl.to(flipContainerRef.current, {
-                duration: 0.8,
-                rotationY: 180,
-                ease: "back.inOut(1.7)",
-            });
-            // Animate the checkmark drawing from offset 70 to 0
-            tl.to(checkmarkRef.current, {
-                strokeDashoffset: 0,
-                duration: 0.5,
-                ease: "power2.out"
-            }, "-=0.5");
-        } else {
-            gsap.to(flipContainerRef.current, {
-                duration: 0,
-                rotationY: 0,
-            });
-        }
+        gsap.to(flipContainerRef.current, {
+            duration: 0.8,
+            rotationY: isFlipped ? 180 : 0,
+            ease: "back.inOut(1.7)",
+        });
     }, { dependencies: [isFlipped], scope: flipContainerRef });
 
     // Pre-fill the form when editing an existing prediction
@@ -212,7 +203,7 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
             setIsFlipped(true); // Trigger the flip animation
             setTimeout(() => {
                 closeForm();
-            }, 2500); // Close form after animation
+            }, 4500); // Close form after a longer delay to show GIF
         } catch (error) {
             setMessage(error.response?.data?.message || 'Failed to save prediction.');
             setIsSubmitting(false); // Re-enable button on error
@@ -225,11 +216,8 @@ const PredictionForm = ({ game, userId, existingPrediction, closeForm }) => {
         <div ref={flipContainerRef} style={{ transformStyle: "preserve-3d" }} className="relative mt-6 border-t border-slate-gray pt-6">
             {/* Back of the card (Success Message) */}
             <div style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }} className="absolute inset-0 flex flex-col items-center justify-center">
-                <svg ref={checkmarkRef} className="w-24 h-24 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"
-                    style={{ strokeDasharray: 70, strokeDashoffset: 70 }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-2xl font-bold text-ice-white mt-4 font-quantico">Prediction Saved!</p>
+                <CelebrationGif winningTeam={winningTeam} />
+                <p className="text-2xl font-bold text-ice-white font-quantico">Prediction Saved!</p>
             </div>
 
             {/* Front of the card (The Form) */}
